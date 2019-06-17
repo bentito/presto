@@ -62,7 +62,6 @@ COPY presto-parquet /build/presto-parquet
 COPY presto-proxy /build/presto-proxy
 COPY presto-hive-hadoop2 /build/presto-hive-hadoop2
 COPY presto-benchto-benchmarks /build/presto-benchto-benchmarks
-COPY presto-docker-image /build/presto-docker-image
 COPY presto-testing-docker /build/presto-testing-docker
 COPY presto-memory-context /build/presto-memory-context
 COPY presto-benchmark /build/presto-benchmark
@@ -94,7 +93,7 @@ RUN yum -y install --setopt=skip_missing_names_on_install=False \
 
 RUN mkdir -p /opt/presto
 
-ENV PRESTO_VERSION 313
+ENV PRESTO_VERSION 315
 ENV PRESTO_HOME /opt/presto/presto-server
 ENV PRESTO_CLI /opt/presto/presto-cli
 ENV PROMETHEUS_JMX_EXPORTER /opt/jmx_exporter/jmx_exporter.jar
