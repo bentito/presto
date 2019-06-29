@@ -82,12 +82,17 @@ RUN mvn dependency:get -Dartifact=io.prometheus.jmx:jmx_prometheus_javaagent:0.3
 
 FROM centos:7
 
+# our copy of faq and jq
+COPY faq.repo /etc/yum.repos.d/ecnahc515-faq-epel-7.repo
+
+RUN yum -y install epel-release
 RUN yum -y install --setopt=skip_missing_names_on_install=False \
         java-1.8.0-openjdk \
         java-1.8.0-openjdk-devel \
         openssl \
         less \
         rsync \
+        faq \
     && yum clean all \
     && rm -rf /var/cache/yum
 
