@@ -2,11 +2,11 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
-: "${REPO_FILE:?}"
+: "${REPO_DIR:?}"
 : "${SUB_MGR_FILE:?}"
 : "${IMAGE_TAG:=latest}"
 
-REPO_MNT="$REPO_FILE:/etc/yum.repos.d/redhat.repo"
+REPO_MNT="$REPO_DIR:/etc/yum.repos.d"
 SUB_MGR_MNT="$SUB_MGR_FILE:/etc/yum/pluginconf.d/subscription-manager.conf"
 imagebuilder \
     -mount "$REPO_MNT" \

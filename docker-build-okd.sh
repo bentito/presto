@@ -3,6 +3,6 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 docker build \
-    -t quay.io/coreos/presto:latest \
-    -f "$DIR/Dockerfile" \
+    -t quay.io/openshift/origin-metering-presto:latest \
+    -f "$DIR/Dockerfile.okd" \
     "$DIR"
