@@ -96,6 +96,10 @@ RUN yum -y install --setopt=skip_missing_names_on_install=False \
     && yum clean all \
     && rm -rf /var/cache/yum
 
+ENV TINI_VERSION v0.18.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /usr/bin/tini
+RUN chmod +x /usr/bin/tini
+
 RUN mkdir -p /opt/presto
 
 ENV PRESTO_VERSION 315
@@ -132,7 +136,7 @@ USER 1003
 EXPOSE 8080
 WORKDIR $PRESTO_HOME
 
-CMD ["bin/launcher", "run"]
+CMD ["tini", "--", "bin/launcher", "run"]
 
 LABEL io.k8s.display-name="OpenShift Presto" \
       io.k8s.description="This is an image used by operator-metering to to install and run Presto." \
