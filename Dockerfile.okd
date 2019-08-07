@@ -78,7 +78,7 @@ RUN cd /build/presto-server && mvn -B -e -T 1C -DskipTests -DfailIfNoTests=false
 # Install presto-cli
 RUN cd /build/presto-cli && mvn -B -e -T 1C -DskipTests -DfailIfNoTests=false -Dtest=false package
 # Install prometheus-jmx agent
-RUN mvn dependency:get -Dartifact=io.prometheus.jmx:jmx_prometheus_javaagent:0.3.1:jar -Ddest=/build/jmx_prometheus_javaagent.jar
+RUN mvn -B dependency:get -Dartifact=io.prometheus.jmx:jmx_prometheus_javaagent:0.3.1:jar -Ddest=/build/jmx_prometheus_javaagent.jar
 
 FROM registry.access.redhat.com/ubi7/ubi
 
