@@ -14,28 +14,39 @@
 package io.prestosql.plugin.prometheus;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.type.InternalTypeManager;
 import org.testng.annotations.Test;
 
 import java.net.URI;
 
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.TABLE_CODEC;
-import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static org.testng.Assert.assertEquals;
 
 public class TestPrometheusTable
 {
+    private static final Metadata METADATA = createTestMetadataManager();
+    public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
     private final PrometheusTable prometheusTable = new PrometheusTable("tableName",
-            ImmutableList.of(new PrometheusColumn("a", createUnboundedVarcharType()), new PrometheusColumn("b", BIGINT)),
+            ImmutableList.of(
+                    new PrometheusColumn("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar,varchar)"))),
+                    new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
+                    new PrometheusColumn("value", DoubleType.DOUBLE)),
             ImmutableList.of(URI.create("file://table-1.json"), URI.create("file://table-2.json")));
 
     @Test
     public void testColumnMetadata()
     {
         assertEquals(prometheusTable.getColumnsMetadata(), ImmutableList.of(
-                new ColumnMetadata("a", createUnboundedVarcharType()),
-                new ColumnMetadata("b", BIGINT)));
+                new ColumnMetadata("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar,varchar)"))),
+                new ColumnMetadata("timestamp", TimestampType.TIMESTAMP),
+                new ColumnMetadata("value", DoubleType.DOUBLE)));
     }
 
     @Test

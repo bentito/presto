@@ -15,9 +15,16 @@ package io.prestosql.plugin.prometheus;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordSet;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.type.InternalTypeManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -26,7 +33,8 @@ import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
+import static io.prestosql.plugin.prometheus.PrometheusRecordCursor.getMapFromBlock;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static org.testng.Assert.assertEquals;
@@ -36,29 +44,36 @@ public class TestPrometheusRecordSetProvider
 {
     private PrometheusHttpServer prometheusHttpServer;
     private URI dataUri;
+    private static final Metadata METADATA = createTestMetadataManager();
+    public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
+    static final Type varcharMapType = TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"));
 
     @Test
     public void testGetRecordSet()
     {
         ConnectorTableHandle tableHandle = new PrometheusTableHandle("schema", "table");
         PrometheusRecordSetProvider recordSetProvider = new PrometheusRecordSetProvider();
-        RecordSet recordSet = recordSetProvider.getRecordSet(PrometheusTransactionHandle.INSTANCE, SESSION, new PrometheusSplit(dataUri), tableHandle, ImmutableList.of(
-                new PrometheusColumnHandle("text", createUnboundedVarcharType(), 0),
-                new PrometheusColumnHandle("value", BIGINT, 1)));
+        RecordSet recordSet = recordSetProvider.getRecordSet(PrometheusTransactionHandle.INSTANCE, SESSION,
+                new PrometheusSplit(dataUri), tableHandle, ImmutableList.of(
+                        new PrometheusColumnHandle("labels", MetadataUtil.mapType(createUnboundedVarcharType(), createUnboundedVarcharType()), 0),
+                        new PrometheusColumnHandle("timestamp", DoubleType.DOUBLE, 1),
+                        new PrometheusColumnHandle("value", DoubleType.DOUBLE, 2)));
         assertNotNull(recordSet, "recordSet is null");
 
         RecordCursor cursor = recordSet.cursor();
         assertNotNull(cursor, "cursor is null");
 
-        Map<String, Long> data = new LinkedHashMap<>();
+        Map<Double, Map> actual = new LinkedHashMap<>();
         while (cursor.advanceNextPosition()) {
-            data.put(cursor.getSlice(0).toStringUtf8(), cursor.getLong(1));
+            actual.put(cursor.getDouble(1), (Map) getMapFromBlock(varcharMapType, (Block) cursor.getObject(0)));
         }
-        assertEquals(data, ImmutableMap.<String, Long>builder()
-                .put("ten", 10L)
-                .put("eleven", 11L)
-                .put("twelve", 12L)
-                .build());
+        Map<Double, Map> expected = ImmutableMap.<Double, Map>builder()
+                .put(1565962969.044 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
+                .put(1565962984.045 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
+                .put(1565962999.044 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
+                .put(1565963014.044 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
+                .build();
+        assertEquals(actual, expected);
     }
 
     //
@@ -70,7 +85,7 @@ public class TestPrometheusRecordSetProvider
             throws Exception
     {
         prometheusHttpServer = new PrometheusHttpServer();
-        dataUri = prometheusHttpServer.resolve("/prometheus-data/numbers-2.csv");
+        dataUri = prometheusHttpServer.resolve("/prometheus-data/up_matrix_response.json");
     }
 
     @AfterClass(alwaysRun = true)

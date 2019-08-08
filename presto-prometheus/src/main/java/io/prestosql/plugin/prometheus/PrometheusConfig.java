@@ -22,6 +22,7 @@ import java.net.URI;
 public class PrometheusConfig
 {
     private URI metadata;
+    private URI metricMetadata;
 
     @NotNull
     public URI getMetadata()
@@ -29,10 +30,23 @@ public class PrometheusConfig
         return metadata;
     }
 
+    @NotNull
+    public URI getMetricMetadata()
+    {
+        return metricMetadata;
+    }
+
     @Config("metadata-uri")
     public PrometheusConfig setMetadata(URI metadata)
     {
         this.metadata = metadata;
+        return this;
+    }
+
+    @Config("metrics-metadata-uri")
+    public PrometheusConfig setMetricMetadata(URI metricMetadata)
+    {
+        this.metricMetadata = metricMetadata;
         return this;
     }
 }

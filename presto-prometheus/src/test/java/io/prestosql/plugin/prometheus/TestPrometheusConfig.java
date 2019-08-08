@@ -29,7 +29,8 @@ public class TestPrometheusConfig
     public void testDefaults()
     {
         assertRecordedDefaults(recordDefaults(PrometheusConfig.class)
-                .setMetadata(null));
+                .setMetadata(null)
+                .setMetricMetadata(null));
     }
 
     @Test
@@ -37,10 +38,13 @@ public class TestPrometheusConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("metadata-uri", "file://test.json")
+                .put("metrics-metadata-uri", "file://test.json")
                 .build();
 
-        PrometheusConfig expected = new PrometheusConfig()
-                .setMetadata(URI.create("file://test.json"));
+        URI uri = URI.create("file://test.json");
+        PrometheusConfig expected = new PrometheusConfig();
+        expected.setMetadata(uri);
+        expected.setMetricMetadata(uri);
 
         assertFullMapping(properties, expected);
     }

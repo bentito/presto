@@ -39,12 +39,13 @@ import static java.util.Objects.requireNonNull;
 public class PrometheusMetadata
         implements ConnectorMetadata
 {
-    private final PrometheusClient prometheusClient;
+    private PrometheusClient prometheusClient;
 
     @Inject
-    public PrometheusMetadata(PrometheusClient prometheusClient)
+    public PrometheusMetadata(PrometheusClient pc)
     {
-        this.prometheusClient = requireNonNull(prometheusClient, "client is null");
+        prometheusClient = pc;
+        requireNonNull(prometheusClient, "client is null");
     }
 
     @Override

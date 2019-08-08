@@ -28,8 +28,8 @@ import static java.util.Objects.requireNonNull;
 public class PrometheusTable
 {
     private final String name;
-    private final List<PrometheusColumn> columns;
-    private final List<ColumnMetadata> columnsMetadata;
+    private List<PrometheusColumn> columns;
+    private List<ColumnMetadata> columnsMetadata;
     private final List<URI> sources;
 
     @JsonCreator
@@ -40,9 +40,8 @@ public class PrometheusTable
     {
         checkArgument(!isNullOrEmpty(name), "name is null or is empty");
         this.name = requireNonNull(name, "name is null");
-        this.columns = ImmutableList.copyOf(requireNonNull(columns, "columns is null"));
+        this.columns = columns;
         this.sources = ImmutableList.copyOf(requireNonNull(sources, "sources is null"));
-
         ImmutableList.Builder<ColumnMetadata> columnsMetadata = ImmutableList.builder();
         for (PrometheusColumn column : this.columns) {
             columnsMetadata.add(new ColumnMetadata(column.getName(), column.getType()));

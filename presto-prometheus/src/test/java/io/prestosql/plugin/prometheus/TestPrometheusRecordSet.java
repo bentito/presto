@@ -15,16 +15,29 @@ package io.prestosql.plugin.prometheus;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Streams;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordSet;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.type.InternalTypeManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
+import static io.prestosql.plugin.prometheus.PrometheusRecordCursor.getBlockFromMap;
+import static io.prestosql.plugin.prometheus.PrometheusRecordCursor.getMapFromBlock;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static org.testng.Assert.assertEquals;
@@ -34,14 +47,18 @@ public class TestPrometheusRecordSet
 {
     private PrometheusHttpServer prometheusHttpServer;
     private URI dataUri;
+    private static final Metadata METADATA = createTestMetadataManager();
+    public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
+    static final Type varcharMapType = TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"));
 
     @Test
     public void testGetColumnTypes()
     {
         RecordSet recordSet = new PrometheusRecordSet(new PrometheusSplit(dataUri), ImmutableList.of(
-                new PrometheusColumnHandle("text", createUnboundedVarcharType(), 0),
-                new PrometheusColumnHandle("value", BIGINT, 1)));
-        assertEquals(recordSet.getColumnTypes(), ImmutableList.of(createUnboundedVarcharType(), BIGINT));
+                new PrometheusColumnHandle("labels", createUnboundedVarcharType(), 0),
+                new PrometheusColumnHandle("value", DoubleType.DOUBLE, 1),
+                new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 2)));
+        assertEquals(recordSet.getColumnTypes(), ImmutableList.of(createUnboundedVarcharType(), DoubleType.DOUBLE, TimestampType.TIMESTAMP));
 
         recordSet = new PrometheusRecordSet(new PrometheusSplit(dataUri), ImmutableList.of(
                 new PrometheusColumnHandle("value", BIGINT, 1),
@@ -62,53 +79,68 @@ public class TestPrometheusRecordSet
     public void testCursorSimple()
     {
         RecordSet recordSet = new PrometheusRecordSet(new PrometheusSplit(dataUri), ImmutableList.of(
-                new PrometheusColumnHandle("text", createUnboundedVarcharType(), 0),
-                new PrometheusColumnHandle("value", BIGINT, 1)));
+                new PrometheusColumnHandle("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)")), 0),
+                new PrometheusColumnHandle("timestamp", DoubleType.DOUBLE, 1),
+                new PrometheusColumnHandle("value", DoubleType.DOUBLE, 2)));
         RecordCursor cursor = recordSet.cursor();
 
-        assertEquals(cursor.getType(0), createUnboundedVarcharType());
-        assertEquals(cursor.getType(1), BIGINT);
+        assertEquals(cursor.getType(0), TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)")));
+        assertEquals(cursor.getType(1), DoubleType.DOUBLE);
+        assertEquals(cursor.getType(2), DoubleType.DOUBLE);
 
-        Map<String, Long> data = new LinkedHashMap<>();
+        List<PrometheusStandardizedRow> actual = new ArrayList<>();
         while (cursor.advanceNextPosition()) {
-            data.put(cursor.getSlice(0).toStringUtf8(), cursor.getLong(1));
+            actual.add(new PrometheusStandardizedRow(
+                    (Block) cursor.getObject(0),
+                    cursor.getDouble(1),
+                    cursor.getDouble(2)));
             assertFalse(cursor.isNull(0));
             assertFalse(cursor.isNull(1));
+            assertFalse(cursor.isNull(2));
         }
-        assertEquals(data, ImmutableMap.<String, Long>builder()
-                .put("ten", 10L)
-                .put("eleven", 11L)
-                .put("twelve", 12L)
-                .build());
+        List<PrometheusStandardizedRow> expected = ImmutableList.<PrometheusStandardizedRow>builder()
+                .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565962969.044 * 1000, 1.0))
+                .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565962984.045 * 1000, 1.0))
+                .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565962999.044 * 1000, 1.0))
+                .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565963014.044 * 1000, 1.0))
+                .build();
+        List<PairLike<PrometheusStandardizedRow, PrometheusStandardizedRow>> pairs = Streams.zip(actual.stream(), expected.stream(), PairLike::new)
+                .collect(Collectors.toList());
+        pairs.stream().forEach(pair -> {
+            assertEquals(getMapFromBlock(varcharMapType, pair.first.labels), getMapFromBlock(varcharMapType, pair.second.labels));
+            assertEquals(pair.first.timestamp, pair.second.timestamp);
+            assertEquals(pair.first.value, pair.second.value);
+        });
     }
 
-    @Test
-    public void testCursorMixedOrder()
-    {
-        RecordSet recordSet = new PrometheusRecordSet(new PrometheusSplit(dataUri), ImmutableList.of(
-                new PrometheusColumnHandle("value", BIGINT, 1),
-                new PrometheusColumnHandle("value", BIGINT, 1),
-                new PrometheusColumnHandle("text", createUnboundedVarcharType(), 0)));
-        RecordCursor cursor = recordSet.cursor();
+    //FIXME pretty sure this test doesn't make sense for fixed column layout of Prometheus data
 
-        Map<String, Long> data = new LinkedHashMap<>();
-        while (cursor.advanceNextPosition()) {
-            assertEquals(cursor.getLong(0), cursor.getLong(1));
-            data.put(cursor.getSlice(2).toStringUtf8(), cursor.getLong(0));
-        }
-        assertEquals(data, ImmutableMap.<String, Long>builder()
-                .put("ten", 10L)
-                .put("eleven", 11L)
-                .put("twelve", 12L)
-                .build());
-    }
+    //    @Test
+    //    public void testCursorMixedOrder()
+    //    {
+    //        RecordSet recordSet = new PrometheusRecordSet(new PrometheusSplit(dataUri), ImmutableList.of(
+    //                new PrometheusColumnHandle("labels", createUnboundedVarcharType(), 0),
+    //                new PrometheusColumnHandle("timestamp", DoubleType.DOUBLE, 1),
+    //                new PrometheusColumnHandle("value", DoubleType.DOUBLE, 2)));
+    //        RecordCursor cursor = recordSet.cursor();
+    //
+    //        Map<String, Double> actual = new LinkedHashMap<>();
+    //        while (cursor.advanceNextPosition()) {
+    //            assertEquals(cursor.getSlice(0).toStringUtf8(), cursor.getSlice(1).toStringUtf8());
+    //            actual.put(cursor.getSlice(0).toStringUtf8(), cursor.getDouble(1));
+    //        }
+    //        assertEquals(actual, ImmutableMap.<String, Double>builder()
+    //                .put("up", 1565962969.044 * 1000)
+    //                .put("up", 1565962984.045 * 1000)
+    //                .build());
+    //    }
 
     //
     // TODO: your code should also have tests for all types that you support and for the state machine of your cursor
-    //
-
-    //
-    // Start http server for testing
     //
 
     @BeforeClass
@@ -116,7 +148,7 @@ public class TestPrometheusRecordSet
             throws Exception
     {
         prometheusHttpServer = new PrometheusHttpServer();
-        dataUri = prometheusHttpServer.resolve("/prometheus-data/numbers-2.csv");
+        dataUri = prometheusHttpServer.resolve("/prometheus-data/up_matrix_response.json");
     }
 
     @AfterClass(alwaysRun = true)

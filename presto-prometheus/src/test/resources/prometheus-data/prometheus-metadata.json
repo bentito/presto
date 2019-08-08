@@ -1,18 +1,22 @@
 {
-    "example": [
+    "prometheus": [
         {
-            "name": "numbers",
+            "name": "runtime_determined",
             "columns": [
                 {
-                    "name": "text",
+                  "name": "labels",
                     "type": "VARCHAR"
                 },
+              {
+                "name": "timestamp",
+                "type": "TIMESTAMP"
+              },
                 {
                     "name": "value",
-                    "type": "BIGINT"
+                    "type": "DOUBLE"
                 }
             ],
-            "sources": [ "numbers-1.csv", "numbers-2.csv" ]
+            "sources": [ "prometheus-metrics.json" ]
         }
     ],
     "tpch": [
@@ -48,10 +52,6 @@
                     "type": "VARCHAR"
                 },
                 {
-                    "name": "shippriority",
-                    "type": "INTEGER"
-                },
-                {
                     "name": "comment",
                     "type": "VARCHAR"
                 }
@@ -72,10 +72,6 @@
                 {
                     "name": "suppkey",
                     "type": "BIGINT"
-                },
-                {
-                    "name": "linenumber",
-                    "type": "INTEGER"
                 },
                 {
                     "name": "quantity",
