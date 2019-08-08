@@ -21,16 +21,22 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import io.airlift.json.JsonCodec;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
 
 import javax.inject.Inject;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Maps.transformValues;
@@ -44,14 +50,21 @@ public class PrometheusClient
      * SchemaName -> (TableName -> TableMetadata)
      */
     private final Supplier<Map<String, Map<String, PrometheusTable>>> schemas;
+    private final Supplier<Map<String, Object>> tables;
+    private static TypeManager typeManager;
 
     @Inject
-    public PrometheusClient(PrometheusConfig config, JsonCodec<Map<String, List<PrometheusTable>>> catalogCodec)
+    public PrometheusClient(PrometheusConfig config, JsonCodec<Map<String, List<PrometheusTable>>> catalogCodec,
+            JsonCodec<Map<String, Object>> metricCodec, TypeManager typeManager)
     {
         requireNonNull(config, "config is null");
         requireNonNull(catalogCodec, "catalogCodec is null");
+        requireNonNull(metricCodec, "metricCodec is null");
+        requireNonNull(typeManager, "typeManager is null");
 
         schemas = Suppliers.memoize(schemasSupplier(catalogCodec, config.getMetadata()));
+        tables = Suppliers.memoize(metricsSupplier(metricCodec, config.getMetricMetadata()));
+        this.typeManager = typeManager;
     }
 
     public Set<String> getSchemaNames()
@@ -62,22 +75,67 @@ public class PrometheusClient
     public Set<String> getTableNames(String schema)
     {
         requireNonNull(schema, "schema is null");
-        Map<String, PrometheusTable> tables = schemas.get().get(schema);
-        if (tables == null) {
-            return ImmutableSet.of();
+        if (schema.equals("prometheus")) {
+            String status = (String) tables.get().get("status");
+            if (status.equals("success")) {
+                List<String> tableNames = (List<String>) tables.get().get("data");
+                if (tableNames == null) {
+                    return ImmutableSet.of();
+                }
+                return tableNames.stream().collect(Collectors.toSet());
+            }
+            else {
+                //TODO this deals with success|error, there may be warnings to handle
+                return ImmutableSet.of();
+            }
         }
-        return tables.keySet();
+        else {
+            Map<String, PrometheusTable> tables = schemas.get().get(schema);
+            if (tables == null) {
+                return ImmutableSet.of();
+            }
+            return tables.keySet();
+        }
     }
 
     public PrometheusTable getTable(String schema, String tableName)
     {
         requireNonNull(schema, "schema is null");
         requireNonNull(tableName, "tableName is null");
-        Map<String, PrometheusTable> tables = schemas.get().get(schema);
-        if (tables == null) {
-            return null;
+        if (schema.equals("prometheus")) {
+            try {
+                List<String> tableNames = (List<String>) tables.get().get("data");
+                if (tableNames == null) {
+                    return null;
+                }
+                if (!tableNames.contains(tableName)) {
+                    return null;
+                }
+                PrometheusTable table = new PrometheusTable(
+                        tableName,
+                        ImmutableList.of(
+                                new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
+                                new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
+                                new PrometheusColumn("value", DoubleType.DOUBLE)),
+                        ImmutableList.of(new URI(
+                                "http://localhost:9090" +
+                                        "/" +
+                                        "api/v1/query?query=" +
+                                        tableName +
+                                        "[365d]")));
+                return table;
+            }
+            catch (ClassCastException | URISyntaxException cce) {
+                return null;
+            }
         }
-        return tables.get(tableName);
+        else {
+            Map<String, PrometheusTable> tables = schemas.get().get(schema);
+            if (tables == null) {
+                return null;
+            }
+            return tables.get(tableName);
+        }
     }
 
     private static Supplier<Map<String, Map<String, PrometheusTable>>> schemasSupplier(final JsonCodec<Map<String, List<PrometheusTable>>> catalogCodec, final URI metadataUri)
@@ -114,7 +172,34 @@ public class PrometheusClient
     {
         return table -> {
             List<URI> sources = ImmutableList.copyOf(transform(table.getSources(), baseUri::resolve));
-            return new PrometheusTable(table.getName(), table.getColumns(), sources);
+            return new PrometheusTable(table.getName(),
+                    ImmutableList.of(
+                            new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
+                            new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
+                            new PrometheusColumn("value", DoubleType.DOUBLE)),
+                    sources);
         };
+    }
+
+    private static Supplier<Map<String, Object>> metricsSupplier(final JsonCodec<Map<String, Object>> metricsCodec, final URI metadataUri)
+    {
+        return () -> {
+            try {
+                return lookupMetrics(metadataUri, metricsCodec);
+            }
+            catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
+    }
+
+    private static Map<String, Object> lookupMetrics(URI metadataUri, JsonCodec<Map<String, Object>> metricsCodec)
+            throws IOException
+    {
+        URL result = metadataUri.toURL();
+        String json = Resources.toString(result, UTF_8);
+        Map<String, Object> metrics = metricsCodec.fromJson(json);
+
+        return metrics;
     }
 }

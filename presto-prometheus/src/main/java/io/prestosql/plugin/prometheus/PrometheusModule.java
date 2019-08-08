@@ -54,6 +54,7 @@ public class PrometheusModule
 
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
         jsonCodecBinder(binder).bindMapJsonCodec(String.class, listJsonCodec(PrometheusTable.class));
+        jsonCodecBinder(binder).bindMapJsonCodec(String.class, Object.class);
     }
 
     public static final class TypeDeserializer

@@ -13,40 +13,44 @@
  */
 package io.prestosql.plugin.prometheus;
 
-import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CountingInputStream;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.block.Block;
+import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.RecordCursor;
+import io.prestosql.spi.type.MapType;
+import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeUtils;
+import io.prestosql.spi.type.VarcharType;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class PrometheusRecordCursor
         implements RecordCursor
 {
-    private static final Splitter LINE_SPLITTER = Splitter.on(",").trimResults();
-
     private final List<PrometheusColumnHandle> columnHandles;
     private final int[] fieldToColumnIndex;
 
-    private final Iterator<String> lines;
+    private final Iterator<PrometheusStandardizedRow> metricsItr;
     private final long totalBytes;
 
-    private List<String> fields;
+    private PrometheusStandardizedRow fields;
 
     public PrometheusRecordCursor(List<PrometheusColumnHandle> columnHandles, ByteSource byteSource)
     {
@@ -59,7 +63,7 @@ public class PrometheusRecordCursor
         }
 
         try (CountingInputStream input = new CountingInputStream(byteSource.openStream())) {
-            lines = byteSource.asCharSource(UTF_8).readLines().iterator();
+            metricsItr = prometheusResultsInStandardizedForm(new PrometheusQueryResponseParse(input).getResults()).iterator();
             totalBytes = input.getCount();
         }
         catch (IOException e) {
@@ -89,68 +93,223 @@ public class PrometheusRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
-        if (!lines.hasNext()) {
+        if (!metricsItr.hasNext()) {
             return false;
         }
-        String line = lines.next();
-        fields = LINE_SPLITTER.splitToList(line);
-
+        fields = metricsItr.next();
         return true;
     }
 
-    private String getFieldValue(int field)
+    private Object getFieldValue(int field)
     {
         checkState(fields != null, "Cursor has not been advanced yet");
 
         int columnIndex = fieldToColumnIndex[field];
-        return fields.get(columnIndex);
+        switch (columnIndex) {
+            case 0:
+                return fields.labels;
+            case 1:
+                return fields.timestamp;
+            case 2:
+                return fields.value;
+        }
+        return null;
     }
 
     @Override
     public boolean getBoolean(int field)
     {
-        checkFieldType(field, BOOLEAN);
-        return Boolean.parseBoolean(getFieldValue(field));
+        return true;
     }
 
+    //TODO understand why timestamp fields are using getLong() to resolve the value
     @Override
     public long getLong(int field)
     {
-        checkFieldType(field, BIGINT);
-        return Long.parseLong(getFieldValue(field));
+        return Math.round((double) getFieldValue(field));
     }
 
     @Override
     public double getDouble(int field)
     {
         checkFieldType(field, DOUBLE);
-        return Double.parseDouble(getFieldValue(field));
+        return (double) getFieldValue(field);
     }
 
     @Override
     public Slice getSlice(int field)
     {
         checkFieldType(field, createUnboundedVarcharType());
-        return Slices.utf8Slice(getFieldValue(field));
+        return Slices.utf8Slice((String) getFieldValue(field));
+    }
+
+    public TimestampWithTimeZoneType getTimestamp(int field)
+    {
+        checkFieldType(field, TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE);
+        return (TimestampWithTimeZoneType) getFieldValue(field);
     }
 
     @Override
     public Object getObject(int field)
     {
-        throw new UnsupportedOperationException();
+        return getFieldValue(field);
     }
 
     @Override
     public boolean isNull(int field)
     {
         checkArgument(field < columnHandles.size(), "Invalid field index");
-        return Strings.isNullOrEmpty(getFieldValue(field));
+        if (getFieldValue(field) == null) {
+            return true;
+        }
+        return false;
     }
 
     private void checkFieldType(int field, Type expected)
     {
         Type actual = getType(field);
         checkArgument(actual.equals(expected), "Expected field %s to be type %s but is %s", field, expected, actual);
+    }
+
+    /**
+     * @param results a list of results from Prometheus, deserialized from JSON response, time series values are in inside list
+     * @return unwrapped inside time series list with each item in returned list having metric labels repeated as item labels
+     */
+    private List<PrometheusStandardizedRow> prometheusResultsInStandardizedForm(List<PrometheusMetricResult> results)
+    {
+        return results.stream().map(result ->
+                result.getTimeSeriesValues().values.stream().map(prometheusTimeSeriesValue ->
+                        new PrometheusStandardizedRow(
+                                getBlockFromMap(columnHandles.get(0).getColumnType(), metricHeaderToMap(result.getMetricHeader())),
+                                (double) prometheusTimeSeriesValue.timestamp.toEpochMilli(),
+                                Double.parseDouble(prometheusTimeSeriesValue.value)))
+                        .collect(Collectors.toList()))
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+    }
+
+    private Map<String, String> metricHeaderToMap(Map<String, String> mapToConvert)
+    {
+        return ImmutableMap.<String, String>builder().putAll(mapToConvert).build();
+    }
+
+    /**
+     * Encodes the given map into a Block.
+     *
+     * @param mapType Presto type of the map
+     * @param map     Map of key/value pairs to encode
+     * @return Presto Block
+     */
+    static Block getBlockFromMap(Type mapType, Map<?, ?> map)
+    {
+        // on functions like COUNT() the Type won't be a MapType
+        if (!(mapType instanceof MapType)) {
+            return null;
+        }
+        Type keyType = mapType.getTypeParameters().get(0);
+        Type valueType = mapType.getTypeParameters().get(1);
+
+        BlockBuilder mapBlockBuilder = mapType.createBlockBuilder(null, 1);
+        BlockBuilder builder = mapBlockBuilder.beginBlockEntry();
+
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            writeObject(builder, keyType, entry.getKey());
+            writeObject(builder, valueType, entry.getValue());
+        }
+
+        mapBlockBuilder.closeEntry();
+        return (Block) mapType.getObject(mapBlockBuilder, 0);
+    }
+
+    /**
+     * Given the map type and Presto Block, decodes the Block into a map of values.
+     *
+     * @param type  Map type
+     * @param block Map block
+     * @return List of values
+     */
+    static Map<Object, Object> getMapFromBlock(Type type, Block block)
+    {
+        Map<Object, Object> map = new HashMap<>(block.getPositionCount() / 2);
+        Type keyType = Types.getKeyType(type);
+        Type valueType = Types.getValueType(type);
+        for (int i = 0; i < block.getPositionCount(); i += 2) {
+            map.put(readObject(keyType, block, i), readObject(valueType, block, i + 1));
+        }
+        return map;
+    }
+
+    /**
+     * Recursive helper function
+     *
+     * @param builder Block builder
+     * @param type    Presto type
+     * @param obj     Object to write to the block builder
+     */
+    static void writeObject(BlockBuilder builder, Type type, Object obj)
+    {
+        if (Types.isArrayType(type)) {
+            BlockBuilder arrayBldr = builder.beginBlockEntry();
+            Type elementType = Types.getElementType(type);
+            for (Object item : (List<?>) obj) {
+                writeObject(arrayBldr, elementType, item);
+            }
+            builder.closeEntry();
+        }
+        else if (Types.isMapType(type)) {
+            BlockBuilder mapBlockBuilder = builder.beginBlockEntry();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) obj).entrySet()) {
+                writeObject(mapBlockBuilder, Types.getKeyType(type), entry.getKey());
+                writeObject(mapBlockBuilder, Types.getValueType(type), entry.getValue());
+            }
+            builder.closeEntry();
+        }
+        else {
+            TypeUtils.writeNativeValue(type, builder, obj);
+        }
+    }
+
+    /**
+     * Recursive helper function
+     *
+     * @param type     Presto type
+     * @param block    Block to decode
+     * @param position Position in the block to get
+     * @return Java object from the Block
+     */
+    static Object readObject(Type type, Block block, int position)
+    {
+        if (Types.isArrayType(type)) {
+            Type elementType = Types.getElementType(type);
+            return getArrayFromBlock(elementType, block.getObject(position, Block.class));
+        }
+        else if (Types.isMapType(type)) {
+            return getMapFromBlock(type, block.getObject(position, Block.class));
+        }
+        else {
+            if (type.getJavaType() == Slice.class) {
+                Slice slice = (Slice) TypeUtils.readNativeValue(type, block, position);
+                return type.equals(VarcharType.VARCHAR) ? slice.toStringUtf8() : slice.getBytes();
+            }
+
+            return TypeUtils.readNativeValue(type, block, position);
+        }
+    }
+
+    /**
+     * Given the array element type and Presto Block, decodes the Block into a list of values.
+     *
+     * @param elementType Array element type
+     * @param block       Array block
+     * @return List of values
+     */
+    static List<Object> getArrayFromBlock(Type elementType, Block block)
+    {
+        ImmutableList.Builder<Object> arrayBuilder = ImmutableList.builder();
+        for (int i = 0; i < block.getPositionCount(); ++i) {
+            arrayBuilder.add(readObject(elementType, block, i));
+        }
+        return arrayBuilder.build();
     }
 
     @Override
