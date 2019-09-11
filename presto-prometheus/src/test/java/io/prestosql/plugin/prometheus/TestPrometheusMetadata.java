@@ -16,7 +16,6 @@ package io.prestosql.plugin.prometheus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.Resources;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -26,21 +25,20 @@ import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.type.InternalTypeManager;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import java.net.URL;
+import java.net.URI;
 import java.util.Optional;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
-import static io.prestosql.plugin.prometheus.MetadataUtil.CATALOG_CODEC;
 import static io.prestosql.plugin.prometheus.MetadataUtil.METRIC_CODEC;
 import static io.prestosql.plugin.prometheus.MetadataUtil.mapType;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -48,30 +46,38 @@ import static org.testng.Assert.fail;
 @Test(singleThreaded = true)
 public class TestPrometheusMetadata
 {
+    private PrometheusHttpServer prometheusHttpServer;
+    private URI dataUri;
     private static final PrometheusTableHandle RUNTIME_DETERMINED_TABLE_HANDLE = new PrometheusTableHandle("prometheus", "up");
     private PrometheusMetadata metadata;
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
 
-    @BeforeMethod
+    @BeforeClass
     public void setUp()
             throws Exception
     {
-        URL metadataUrl = Resources.getResource(TestPrometheusClient.class, "/prometheus-data/prometheus-metadata.json");
-        URL metricsMetadataUrl = Resources.getResource(TestPrometheusClient.class, "/prometheus-data/prometheus-metrics.json");
-        assertNotNull(metadataUrl, "metadataUrl is null");
-        assertNotNull(metricsMetadataUrl, "metricsMetadataUrl is null");
+        prometheusHttpServer = new PrometheusHttpServer();
         PrometheusConfig config = new PrometheusConfig();
-        config.setMetadata(metadataUrl.toURI());
-        config.setMetricMetadata(metricsMetadataUrl.toURI());
-        PrometheusClient client = new PrometheusClient(config, CATALOG_CODEC, METRIC_CODEC, TYPE_MANAGER);
+        dataUri = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
+        config.setPrometheusURI(dataUri);
+        PrometheusClient client = new PrometheusClient(config, METRIC_CODEC, TYPE_MANAGER);
         metadata = new PrometheusMetadata(client);
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void tearDown()
+            throws Exception
+    {
+        if (prometheusHttpServer != null) {
+            prometheusHttpServer.stop();
+        }
     }
 
     @Test
     public void testListSchemaNames()
     {
-        assertEquals(metadata.listSchemaNames(SESSION), ImmutableSet.of("prometheus", "tpch"));
+        assertEquals(metadata.listSchemaNames(SESSION), ImmutableSet.of("prometheus"));
     }
 
     @Test
@@ -128,9 +134,6 @@ public class TestPrometheusMetadata
     public void testListTables()
     {
         assertTrue(ImmutableSet.copyOf(metadata.listTables(SESSION, Optional.of("prometheus"))).contains(new SchemaTableName("prometheus", "up")));
-        assertEquals(ImmutableSet.copyOf(metadata.listTables(SESSION, Optional.of("tpch"))), ImmutableSet.of(
-                new SchemaTableName("tpch", "orders"),
-                new SchemaTableName("tpch", "lineitem")));
 
         // unknown schema
         assertEquals(ImmutableSet.copyOf(metadata.listTables(SESSION, Optional.of("unknown"))), ImmutableSet.of());

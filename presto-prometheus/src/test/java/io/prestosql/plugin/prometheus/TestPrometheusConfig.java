@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 
 import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
@@ -27,24 +28,25 @@ public class TestPrometheusConfig
 {
     @Test
     public void testDefaults()
+            throws URISyntaxException
     {
         assertRecordedDefaults(recordDefaults(PrometheusConfig.class)
-                .setMetadata(null)
-                .setMetricMetadata(null));
+                .setPrometheusURI(null)
+                .setQueryChunkSizeDuration(null));
     }
 
     @Test
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("metadata-uri", "file://test.json")
-                .put("metrics-metadata-uri", "file://test.json")
+                .put("prometheus-uri", "file://test.json")
+                .put("query-chunk-size-duration", "365d")
                 .build();
 
         URI uri = URI.create("file://test.json");
         PrometheusConfig expected = new PrometheusConfig();
-        expected.setMetadata(uri);
-        expected.setMetricMetadata(uri);
+        expected.setPrometheusURI(uri);
+        expected.setQueryChunkSizeDuration("365d");
 
         assertFullMapping(properties, expected);
     }

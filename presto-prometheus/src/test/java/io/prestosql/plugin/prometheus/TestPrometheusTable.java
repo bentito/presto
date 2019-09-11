@@ -23,8 +23,6 @@ import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.type.InternalTypeManager;
 import org.testng.annotations.Test;
 
-import java.net.URI;
-
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.TABLE_CODEC;
 import static org.testng.Assert.assertEquals;
@@ -37,8 +35,7 @@ public class TestPrometheusTable
             ImmutableList.of(
                     new PrometheusColumn("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar,varchar)"))),
                     new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
-                    new PrometheusColumn("value", DoubleType.DOUBLE)),
-            ImmutableList.of(URI.create("file://table-1.json"), URI.create("file://table-2.json")));
+                    new PrometheusColumn("value", DoubleType.DOUBLE)));
 
     @Test
     public void testColumnMetadata()
@@ -57,6 +54,5 @@ public class TestPrometheusTable
 
         assertEquals(prometheusTableCopy.getName(), prometheusTable.getName());
         assertEquals(prometheusTableCopy.getColumns(), prometheusTable.getColumns());
-        assertEquals(prometheusTableCopy.getSources(), prometheusTable.getSources());
     }
 }

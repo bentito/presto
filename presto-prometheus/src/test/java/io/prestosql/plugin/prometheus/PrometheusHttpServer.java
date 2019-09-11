@@ -36,6 +36,8 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Map;
 
+import static io.prestosql.plugin.prometheus.PrometheusClient.METRICS_ENDPOINT;
+
 public class PrometheusHttpServer
 {
     private final LifeCycleManager lifeCycleManager;
@@ -87,7 +89,14 @@ public class PrometheusHttpServer
         protected void doGet(HttpServletRequest request, HttpServletResponse response)
                 throws IOException
         {
-            URL dataUrl = Resources.getResource(TestPrometheusClient.class, request.getPathInfo());
+            URL dataUrl;
+            // allow for special response on Prometheus metrics endpoint
+            if (request.getPathInfo().contains(METRICS_ENDPOINT)) {
+                dataUrl = Resources.getResource(TestPrometheusClient.class, request.getPathInfo().split(METRICS_ENDPOINT)[0]);
+            }
+            else {
+                dataUrl = Resources.getResource(TestPrometheusClient.class, request.getPathInfo());
+            }
             Resources.asByteSource(dataUrl).copyTo(response.getOutputStream());
         }
     }
