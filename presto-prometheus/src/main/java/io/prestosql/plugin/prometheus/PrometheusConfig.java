@@ -21,32 +21,32 @@ import java.net.URI;
 
 public class PrometheusConfig
 {
-    private URI metadata;
-    private URI metricMetadata;
+    private URI prometheusURI;
+    private String queryChunkSizeDuration;
 
     @NotNull
-    public URI getMetadata()
+    public URI getPrometheusURI()
     {
-        return metadata;
+        return prometheusURI;
     }
 
-    @NotNull
-    public URI getMetricMetadata()
+    @Config("prometheus-uri")
+    public PrometheusConfig setPrometheusURI(URI prometheusURI)
     {
-        return metricMetadata;
-    }
-
-    @Config("metadata-uri")
-    public PrometheusConfig setMetadata(URI metadata)
-    {
-        this.metadata = metadata;
+        this.prometheusURI = prometheusURI;
         return this;
     }
 
-    @Config("metrics-metadata-uri")
-    public PrometheusConfig setMetricMetadata(URI metricMetadata)
+    @NotNull
+    public String getQueryChunkSizeDuration()
     {
-        this.metricMetadata = metricMetadata;
+        return queryChunkSizeDuration;
+    }
+
+    @Config("query-chunk-size-duration")
+    public PrometheusConfig setQueryChunkSizeDuration(String queryChunkSizeDuration)
+    {
+        this.queryChunkSizeDuration = queryChunkSizeDuration;
         return this;
     }
 }

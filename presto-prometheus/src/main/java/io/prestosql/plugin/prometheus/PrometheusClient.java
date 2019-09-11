@@ -46,30 +46,35 @@ import static java.util.Objects.requireNonNull;
 
 public class PrometheusClient
 {
-    /**
-     * SchemaName -> (TableName -> TableMetadata)
-     */
-    private final Supplier<Map<String, Map<String, PrometheusTable>>> schemas;
+    // schema name is fixed to "prometheus"
     private final Supplier<Map<String, Object>> tables;
+    protected final PrometheusConfig config;
     private static TypeManager typeManager;
+    protected static final String METRICS_ENDPOINT = "/api/v1/label/__name__/values";
 
     @Inject
-    public PrometheusClient(PrometheusConfig config, JsonCodec<Map<String, List<PrometheusTable>>> catalogCodec,
-            JsonCodec<Map<String, Object>> metricCodec, TypeManager typeManager)
+    public PrometheusClient(PrometheusConfig config, JsonCodec<Map<String, Object>> metricCodec, TypeManager typeManager)
+            throws URISyntaxException
     {
         requireNonNull(config, "config is null");
-        requireNonNull(catalogCodec, "catalogCodec is null");
         requireNonNull(metricCodec, "metricCodec is null");
         requireNonNull(typeManager, "typeManager is null");
 
-        schemas = Suppliers.memoize(schemasSupplier(catalogCodec, config.getMetadata()));
-        tables = Suppliers.memoize(metricsSupplier(metricCodec, config.getMetricMetadata()));
+        tables = Suppliers.memoize(metricsSupplier(metricCodec, getPrometheusMetricsURI(config)));
+        this.config = config;
         this.typeManager = typeManager;
     }
 
     public Set<String> getSchemaNames()
     {
-        return schemas.get().keySet();
+        return ImmutableSet.of("prometheus");
+    }
+
+    private URI getPrometheusMetricsURI(PrometheusConfig config)
+            throws URISyntaxException
+    {
+        // endpoint to retrieve metric names from Prometheus
+        return new URI(config.getPrometheusURI().toString().concat(METRICS_ENDPOINT));
     }
 
     public Set<String> getTableNames(String schema)
@@ -89,13 +94,7 @@ public class PrometheusClient
                 return ImmutableSet.of();
             }
         }
-        else {
-            Map<String, PrometheusTable> tables = schemas.get().get(schema);
-            if (tables == null) {
-                return ImmutableSet.of();
-            }
-            return tables.keySet();
-        }
+        return ImmutableSet.of();
     }
 
     public PrometheusTable getTable(String schema, String tableName)
@@ -103,38 +102,23 @@ public class PrometheusClient
         requireNonNull(schema, "schema is null");
         requireNonNull(tableName, "tableName is null");
         if (schema.equals("prometheus")) {
-            try {
-                List<String> tableNames = (List<String>) tables.get().get("data");
-                if (tableNames == null) {
-                    return null;
-                }
-                if (!tableNames.contains(tableName)) {
-                    return null;
-                }
-                PrometheusTable table = new PrometheusTable(
-                        tableName,
-                        ImmutableList.of(
-                                new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
-                                new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
-                                new PrometheusColumn("value", DoubleType.DOUBLE)),
-                        ImmutableList.of(new URI(
-                                "http://localhost:9090" +
-                                        "/" +
-                                        "api/v1/query?query=" +
-                                        tableName +
-                                        "[365d]")));
-                return table;
-            }
-            catch (ClassCastException | URISyntaxException cce) {
+            List<String> tableNames = (List<String>) tables.get().get("data");
+            if (tableNames == null) {
                 return null;
             }
+            if (!tableNames.contains(tableName)) {
+                return null;
+            }
+            PrometheusTable table = new PrometheusTable(
+                    tableName,
+                    ImmutableList.of(
+                            new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
+                            new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
+                            new PrometheusColumn("value", DoubleType.DOUBLE)));
+            return table;
         }
         else {
-            Map<String, PrometheusTable> tables = schemas.get().get(schema);
-            if (tables == null) {
-                return null;
-            }
-            return tables.get(tableName);
+            return null;
         }
     }
 
@@ -170,15 +154,11 @@ public class PrometheusClient
 
     private static Function<PrometheusTable, PrometheusTable> tableUriResolver(final URI baseUri)
     {
-        return table -> {
-            List<URI> sources = ImmutableList.copyOf(transform(table.getSources(), baseUri::resolve));
-            return new PrometheusTable(table.getName(),
-                    ImmutableList.of(
-                            new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
-                            new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
-                            new PrometheusColumn("value", DoubleType.DOUBLE)),
-                    sources);
-        };
+        return table -> new PrometheusTable(table.getName(),
+                ImmutableList.of(
+                        new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
+                        new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
+                        new PrometheusColumn("value", DoubleType.DOUBLE)));
     }
 
     private static Supplier<Map<String, Object>> metricsSupplier(final JsonCodec<Map<String, Object>> metricsCodec, final URI metadataUri)

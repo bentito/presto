@@ -24,7 +24,10 @@ import io.prestosql.spi.connector.TableNotFoundException;
 
 import javax.inject.Inject;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -58,11 +61,27 @@ public class PrometheusSplitManager
         }
 
         List<ConnectorSplit> splits = new ArrayList<>();
-        for (URI uri : table.getSources()) {
-            splits.add(new PrometheusSplit(uri));
+        try {
+            splits.add(new PrometheusSplit(buildQuery(prometheusClient.config.getPrometheusURI(), table.getName())));
+        }
+        catch (UnsupportedEncodingException e) {
+            throw new UnsupportedOperationException(e.getMessage());
+        }
+        catch (URISyntaxException e) {
+            throw new UnsupportedOperationException(e.getMessage());
         }
         Collections.shuffle(splits);
 
         return new FixedSplitSource(splits);
+    }
+
+    private URI buildQuery(URI baseURI, String tableName)
+            throws UnsupportedEncodingException, URISyntaxException
+    {
+        return new URI(baseURI.toString() +
+                "/" +
+                "api/v1/query?query=" +
+                URLEncoder.encode(tableName, "UTF-8") +
+                "[" + prometheusClient.config.getQueryChunkSizeDuration() + "]");
     }
 }

@@ -66,8 +66,7 @@ public class PrometheusMetadata
             return null;
         }
 
-        PrometheusTable table = prometheusClient.getTable(tableName.getSchemaName(), tableName.getTableName());
-        if (table == null) {
+        if (prometheusClient.getTable(tableName.getSchemaName(), tableName.getTableName()) == null) {
             return null;
         }
 

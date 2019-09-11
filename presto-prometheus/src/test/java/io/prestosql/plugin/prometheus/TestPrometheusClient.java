@@ -15,20 +15,19 @@ package io.prestosql.plugin.prometheus;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.Resources;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.type.InternalTypeManager;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
-import java.net.URL;
 import java.util.Set;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
-import static io.prestosql.plugin.prometheus.MetadataUtil.CATALOG_CODEC;
 import static io.prestosql.plugin.prometheus.MetadataUtil.METRIC_CODEC;
 import static io.prestosql.plugin.prometheus.MetadataUtil.mapType;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
@@ -39,27 +38,37 @@ import static org.testng.Assert.assertTrue;
 
 public class TestPrometheusClient
 {
+    private PrometheusHttpServer prometheusHttpServer;
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
+
+    @BeforeClass
+    public void setUp()
+            throws Exception
+    {
+        prometheusHttpServer = new PrometheusHttpServer();
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void tearDown()
+            throws Exception
+    {
+        if (prometheusHttpServer != null) {
+            prometheusHttpServer.stop();
+        }
+    }
 
     @Test
     public void testMetadata()
             throws Exception
     {
-        URL metadataUrl = Resources.getResource(TestPrometheusClient.class, "/prometheus-data/prometheus-metadata.json");
-        assertNotNull(metadataUrl, "metadataUrl is null");
-        URI metadata = metadataUrl.toURI();
-        URL metricsMetadataUrl = Resources.getResource(TestPrometheusClient.class, "/prometheus-data/prometheus-metrics.json");
-        assertNotNull(metricsMetadataUrl, "metricsMetadataUrl is null");
-        URI metricsMetadata = metricsMetadataUrl.toURI();
+        URI metricsMetadata = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
         PrometheusConfig config = new PrometheusConfig();
-        config.setMetadata(metadata);
-        config.setMetricMetadata(metricsMetadata);
-        PrometheusClient client = new PrometheusClient(config, CATALOG_CODEC, METRIC_CODEC, TYPE_MANAGER);
-        assertEquals(client.getSchemaNames(), ImmutableSet.of("prometheus", "tpch"));
+        config.setPrometheusURI(metricsMetadata);
+        config.setQueryChunkSizeDuration("365d");
+        PrometheusClient client = new PrometheusClient(config, METRIC_CODEC, TYPE_MANAGER);
+        assertEquals(client.getSchemaNames(), ImmutableSet.of("prometheus"));
         assertTrue(client.getTableNames("prometheus").contains("up"));
-        assertEquals(client.getTableNames("tpch"), ImmutableSet.of("orders", "lineitem"));
-
         PrometheusTable table = client.getTable("prometheus", "up");
         assertNotNull(table, "table is null");
         assertEquals(table.getName(), "up");
@@ -67,23 +76,16 @@ public class TestPrometheusClient
                 new PrometheusColumn("labels", mapType(createUnboundedVarcharType(), createUnboundedVarcharType())),
                 new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
                 new PrometheusColumn("value", DoubleType.DOUBLE)));
-        assertEquals(table.getSources(), ImmutableList.of(metadata.resolve("http://localhost:9090/api/v1/query?query=up[365d]")));
     }
 
     @Test
     public void testHandleErrorResponse()
             throws Exception
     {
-        URL metadataUrl = Resources.getResource(TestPrometheusClient.class, "/prometheus-data/prometheus-metadata.json");
-        assertNotNull(metadataUrl, "metadataUrl is null");
-        URI metadata = metadataUrl.toURI();
-        URL metricsMetadataUrl = Resources.getResource(TestPrometheusClient.class, "/prometheus-data/prometheus-metrics-error.json");
-        assertNotNull(metricsMetadataUrl, "metricsMetadataUrl is null");
-        URI metricsMetadata = metricsMetadataUrl.toURI();
+        URI metricsMetadata = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics-error.json");
         PrometheusConfig config = new PrometheusConfig();
-        config.setMetadata(metadata);
-        config.setMetricMetadata(metricsMetadata);
-        PrometheusClient client = new PrometheusClient(config, CATALOG_CODEC, METRIC_CODEC, TYPE_MANAGER);
+        config.setPrometheusURI(metricsMetadata);
+        PrometheusClient client = new PrometheusClient(config, METRIC_CODEC, TYPE_MANAGER);
         Set<String> tableNames = client.getTableNames("prometheus");
         assertEquals(tableNames, ImmutableSet.of());
         PrometheusTable table = client.getTable("prometheus", "up");

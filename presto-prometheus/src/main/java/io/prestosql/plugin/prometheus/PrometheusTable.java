@@ -18,7 +18,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.connector.ColumnMetadata;
 
-import java.net.URI;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -30,18 +29,15 @@ public class PrometheusTable
     private final String name;
     private List<PrometheusColumn> columns;
     private List<ColumnMetadata> columnsMetadata;
-    private final List<URI> sources;
 
     @JsonCreator
     public PrometheusTable(
             @JsonProperty("name") String name,
-            @JsonProperty("columns") List<PrometheusColumn> columns,
-            @JsonProperty("sources") List<URI> sources)
+            @JsonProperty("columns") List<PrometheusColumn> columns)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or is empty");
         this.name = requireNonNull(name, "name is null");
         this.columns = columns;
-        this.sources = ImmutableList.copyOf(requireNonNull(sources, "sources is null"));
         ImmutableList.Builder<ColumnMetadata> columnsMetadata = ImmutableList.builder();
         for (PrometheusColumn column : this.columns) {
             columnsMetadata.add(new ColumnMetadata(column.getName(), column.getType()));
@@ -59,12 +55,6 @@ public class PrometheusTable
     public List<PrometheusColumn> getColumns()
     {
         return columns;
-    }
-
-    @JsonProperty
-    public List<URI> getSources()
-    {
-        return sources;
     }
 
     public List<ColumnMetadata> getColumnsMetadata()
