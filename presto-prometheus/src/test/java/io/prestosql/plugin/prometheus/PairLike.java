@@ -23,9 +23,4 @@ class PairLike<F, S>
         this.first = first;
         this.second = second;
     }
-
-    public static <F, S> PairLike<F, S> of(F f, S s)
-    {
-        return new PairLike<F, S>(f, s);
-    }
 }
