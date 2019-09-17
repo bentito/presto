@@ -13,11 +13,9 @@
  */
 package io.prestosql.plugin.prometheus;
 
-import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import io.airlift.json.JsonCodec;
@@ -25,6 +23,7 @@ import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
+import org.apache.http.client.utils.URIBuilder;
 
 import javax.inject.Inject;
 
@@ -38,9 +37,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.google.common.collect.Iterables.transform;
-import static com.google.common.collect.Maps.transformValues;
-import static com.google.common.collect.Maps.uniqueIndex;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -74,7 +70,12 @@ public class PrometheusClient
             throws URISyntaxException
     {
         // endpoint to retrieve metric names from Prometheus
-        return new URI(config.getPrometheusURI().toString().concat(METRICS_ENDPOINT));
+        URI uri = config.getPrometheusURI();
+        return new URIBuilder()
+                .setScheme(uri.getScheme())
+                .setHost(uri.getAuthority())
+                .setPath(uri.getPath().concat(METRICS_ENDPOINT))
+                .build();
     }
 
     public Set<String> getTableNames(String schema)
@@ -120,45 +121,6 @@ public class PrometheusClient
         else {
             return null;
         }
-    }
-
-    private static Supplier<Map<String, Map<String, PrometheusTable>>> schemasSupplier(final JsonCodec<Map<String, List<PrometheusTable>>> catalogCodec, final URI metadataUri)
-    {
-        return () -> {
-            try {
-                return lookupSchemas(metadataUri, catalogCodec);
-            }
-            catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        };
-    }
-
-    private static Map<String, Map<String, PrometheusTable>> lookupSchemas(URI metadataUri, JsonCodec<Map<String, List<PrometheusTable>>> catalogCodec)
-            throws IOException
-    {
-        URL result = metadataUri.toURL();
-        String json = Resources.toString(result, UTF_8);
-        Map<String, List<PrometheusTable>> catalog = catalogCodec.fromJson(json);
-
-        return ImmutableMap.copyOf(transformValues(catalog, resolveAndIndexTables(metadataUri)));
-    }
-
-    private static Function<List<PrometheusTable>, Map<String, PrometheusTable>> resolveAndIndexTables(final URI metadataUri)
-    {
-        return tables -> {
-            Iterable<PrometheusTable> resolvedTables = transform(tables, tableUriResolver(metadataUri));
-            return ImmutableMap.copyOf(uniqueIndex(resolvedTables, PrometheusTable::getName));
-        };
-    }
-
-    private static Function<PrometheusTable, PrometheusTable> tableUriResolver(final URI baseUri)
-    {
-        return table -> new PrometheusTable(table.getName(),
-                ImmutableList.of(
-                        new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
-                        new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
-                        new PrometheusColumn("value", DoubleType.DOUBLE)));
     }
 
     private static Supplier<Map<String, Object>> metricsSupplier(final JsonCodec<Map<String, Object>> metricsCodec, final URI metadataUri)

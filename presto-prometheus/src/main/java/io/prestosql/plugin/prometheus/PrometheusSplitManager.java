@@ -21,13 +21,14 @@ import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedSplitSource;
 import io.prestosql.spi.connector.TableNotFoundException;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.message.BasicNameValuePair;
 
 import javax.inject.Inject;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -64,9 +65,6 @@ public class PrometheusSplitManager
         try {
             splits.add(new PrometheusSplit(buildQuery(prometheusClient.config.getPrometheusURI(), table.getName())));
         }
-        catch (UnsupportedEncodingException e) {
-            throw new UnsupportedOperationException(e.getMessage());
-        }
         catch (URISyntaxException e) {
             throw new UnsupportedOperationException(e.getMessage());
         }
@@ -75,13 +73,15 @@ public class PrometheusSplitManager
         return new FixedSplitSource(splits);
     }
 
+    // URIBuilder handles URI encode
     private URI buildQuery(URI baseURI, String tableName)
-            throws UnsupportedEncodingException, URISyntaxException
+            throws URISyntaxException
     {
-        return new URI(baseURI.toString() +
-                "/" +
-                "api/v1/query?query=" +
-                URLEncoder.encode(tableName, "UTF-8") +
-                "[" + prometheusClient.config.getQueryChunkSizeDuration() + "]");
+        List<NameValuePair> nameValuePairs = new ArrayList<>(1);
+        nameValuePairs.add(new BasicNameValuePair("query",
+                tableName + "[" + prometheusClient.config.getQueryChunkSizeDuration() + "]"));
+        return new URIBuilder(baseURI.toString())
+                .setPath("api/v1/query")
+                .setParameters(nameValuePairs).build();
     }
 }

@@ -23,7 +23,6 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.type.MapType;
-import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.type.VarcharType;
@@ -141,12 +140,6 @@ public class PrometheusRecordCursor
     {
         checkFieldType(field, createUnboundedVarcharType());
         return Slices.utf8Slice((String) getFieldValue(field));
-    }
-
-    public TimestampWithTimeZoneType getTimestamp(int field)
-    {
-        checkFieldType(field, TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE);
-        return (TimestampWithTimeZoneType) getFieldValue(field);
     }
 
     @Override
