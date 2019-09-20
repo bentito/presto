@@ -15,6 +15,7 @@ package io.prestosql.plugin.prometheus;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.ConfigurationException;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
@@ -31,6 +32,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.METRIC_CODEC;
 import static io.prestosql.plugin.prometheus.MetadataUtil.mapType;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -63,13 +65,15 @@ public class TestPrometheusClient
             throws Exception
     {
         URI metricsMetadata = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
-        PrometheusConfig config = new PrometheusConfig();
+        PrometheusConnectorConfig config = new PrometheusConnectorConfig();
         config.setPrometheusURI(metricsMetadata);
-        config.setQueryChunkSizeDuration("365d");
+        config.setQueryChunkSizeDuration("1d");
+        config.setMaxQueryRangeDuration("21d");
+        config.setCacheDuration("30s");
         PrometheusClient client = new PrometheusClient(config, METRIC_CODEC, TYPE_MANAGER);
-        assertEquals(client.getSchemaNames(), ImmutableSet.of("prometheus"));
-        assertTrue(client.getTableNames("prometheus").contains("up"));
-        PrometheusTable table = client.getTable("prometheus", "up");
+        assertEquals(client.getSchemaNames(), ImmutableSet.of("default"));
+        assertTrue(client.getTableNames("default").contains("up"));
+        PrometheusTable table = client.getTable("default", "up");
         assertNotNull(table, "table is null");
         assertEquals(table.getName(), "up");
         assertEquals(table.getColumns(), ImmutableList.of(
@@ -83,12 +87,29 @@ public class TestPrometheusClient
             throws Exception
     {
         URI metricsMetadata = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics-error.json");
-        PrometheusConfig config = new PrometheusConfig();
+        PrometheusConnectorConfig config = new PrometheusConnectorConfig();
         config.setPrometheusURI(metricsMetadata);
+        config.setQueryChunkSizeDuration("1d");
+        config.setMaxQueryRangeDuration("21d");
+        config.setCacheDuration("30s");
         PrometheusClient client = new PrometheusClient(config, METRIC_CODEC, TYPE_MANAGER);
-        Set<String> tableNames = client.getTableNames("prometheus");
+        Set<String> tableNames = client.getTableNames("default");
         assertEquals(tableNames, ImmutableSet.of());
-        PrometheusTable table = client.getTable("prometheus", "up");
+        PrometheusTable table = client.getTable("default", "up");
         assertNull(table);
+    }
+
+    @Test
+    public void testFailOnDurationLessThanQueryChunkConfig()
+            throws Exception
+    {
+        PrometheusConnectorConfig config = new PrometheusConnectorConfig();
+        config.setPrometheusURI(new URI("http://doesnotmatter.com"));
+        config.setQueryChunkSizeDuration("21d");
+        config.setMaxQueryRangeDuration("1d");
+        config.setCacheDuration("30s");
+        assertThatThrownBy(() -> new PrometheusClient(config, METRIC_CODEC, TYPE_MANAGER))
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("max-query-range-duration must be greater than query-chunk-size-duration");
     }
 }

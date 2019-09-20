@@ -48,7 +48,7 @@ public class TestPrometheusMetadata
 {
     private PrometheusHttpServer prometheusHttpServer;
     private URI dataUri;
-    private static final PrometheusTableHandle RUNTIME_DETERMINED_TABLE_HANDLE = new PrometheusTableHandle("prometheus", "up");
+    private static final PrometheusTableHandle RUNTIME_DETERMINED_TABLE_HANDLE = new PrometheusTableHandle("default", "up");
     private PrometheusMetadata metadata;
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
@@ -58,9 +58,12 @@ public class TestPrometheusMetadata
             throws Exception
     {
         prometheusHttpServer = new PrometheusHttpServer();
-        PrometheusConfig config = new PrometheusConfig();
+        PrometheusConnectorConfig config = new PrometheusConnectorConfig();
         dataUri = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
         config.setPrometheusURI(dataUri);
+        config.setQueryChunkSizeDuration("1d");
+        config.setMaxQueryRangeDuration("21d");
+        config.setCacheDuration("30s");
         PrometheusClient client = new PrometheusClient(config, METRIC_CODEC, TYPE_MANAGER);
         metadata = new PrometheusMetadata(client);
     }
@@ -77,14 +80,14 @@ public class TestPrometheusMetadata
     @Test
     public void testListSchemaNames()
     {
-        assertEquals(metadata.listSchemaNames(SESSION), ImmutableSet.of("prometheus"));
+        assertEquals(metadata.listSchemaNames(SESSION), ImmutableSet.of("default"));
     }
 
     @Test
     public void testGetTableHandle()
     {
-        assertEquals(metadata.getTableHandle(SESSION, new SchemaTableName("prometheus", "up")), RUNTIME_DETERMINED_TABLE_HANDLE);
-        assertNull(metadata.getTableHandle(SESSION, new SchemaTableName("prometheus", "unknown")));
+        assertEquals(metadata.getTableHandle(SESSION, new SchemaTableName("default", "up")), RUNTIME_DETERMINED_TABLE_HANDLE);
+        assertNull(metadata.getTableHandle(SESSION, new SchemaTableName("default", "unknown")));
         assertNull(metadata.getTableHandle(SESSION, new SchemaTableName("unknown", "numbers")));
         assertNull(metadata.getTableHandle(SESSION, new SchemaTableName("unknown", "unknown")));
     }
@@ -106,7 +109,7 @@ public class TestPrometheusMetadata
         catch (TableNotFoundException expected) {
         }
         try {
-            metadata.getColumnHandles(SESSION, new PrometheusTableHandle("prometheus", "unknown"));
+            metadata.getColumnHandles(SESSION, new PrometheusTableHandle("default", "unknown"));
             fail("Expected getColumnHandle of unknown table to throw a TableNotFoundException");
         }
         catch (TableNotFoundException expected) {
@@ -118,7 +121,7 @@ public class TestPrometheusMetadata
     {
         // known table
         ConnectorTableMetadata tableMetadata = metadata.getTableMetadata(SESSION, RUNTIME_DETERMINED_TABLE_HANDLE);
-        assertEquals(tableMetadata.getTable(), new SchemaTableName("prometheus", "up"));
+        assertEquals(tableMetadata.getTable(), new SchemaTableName("default", "up"));
         assertEquals(tableMetadata.getColumns(), ImmutableList.of(
                 new ColumnMetadata("labels", mapType(createUnboundedVarcharType(), createUnboundedVarcharType())),
                 new ColumnMetadata("timestamp", TimestampType.TIMESTAMP),
@@ -126,14 +129,14 @@ public class TestPrometheusMetadata
 
         // unknown tables should produce null
         assertNull(metadata.getTableMetadata(SESSION, new PrometheusTableHandle("unknown", "unknown")));
-        assertNull(metadata.getTableMetadata(SESSION, new PrometheusTableHandle("prometheus", "unknown")));
+        assertNull(metadata.getTableMetadata(SESSION, new PrometheusTableHandle("default", "unknown")));
         assertNull(metadata.getTableMetadata(SESSION, new PrometheusTableHandle("unknown", "numbers")));
     }
 
     @Test
     public void testListTables()
     {
-        assertTrue(ImmutableSet.copyOf(metadata.listTables(SESSION, Optional.of("prometheus"))).contains(new SchemaTableName("prometheus", "up")));
+        assertTrue(ImmutableSet.copyOf(metadata.listTables(SESSION, Optional.of("default"))).contains(new SchemaTableName("default", "up")));
 
         // unknown schema
         assertEquals(ImmutableSet.copyOf(metadata.listTables(SESSION, Optional.of("unknown"))), ImmutableSet.of());
@@ -158,7 +161,7 @@ public class TestPrometheusMetadata
         metadata.createTable(
                 SESSION,
                 new ConnectorTableMetadata(
-                        new SchemaTableName("prometheus", "foo"),
+                        new SchemaTableName("default", "foo"),
                         ImmutableList.of(new ColumnMetadata("text", createUnboundedVarcharType()))),
                 false);
     }

@@ -50,7 +50,7 @@ public class PrometheusModule
         binder.bind(PrometheusClient.class).in(Scopes.SINGLETON);
         binder.bind(PrometheusSplitManager.class).in(Scopes.SINGLETON);
         binder.bind(PrometheusRecordSetProvider.class).in(Scopes.SINGLETON);
-        configBinder(binder).bindConfig(PrometheusConfig.class);
+        configBinder(binder).bindConfig(PrometheusConnectorConfig.class);
 
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
         jsonCodecBinder(binder).bindMapJsonCodec(String.class, listJsonCodec(PrometheusTable.class));

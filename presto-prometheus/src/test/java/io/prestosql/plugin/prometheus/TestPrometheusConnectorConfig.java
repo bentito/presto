@@ -24,32 +24,36 @@ import static io.airlift.configuration.testing.ConfigAssertions.assertFullMappin
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
 import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
 
-public class TestPrometheusConfig
+public class TestPrometheusConnectorConfig
 {
     @Test
     public void testDefaults()
             throws URISyntaxException
     {
-        assertRecordedDefaults(recordDefaults(PrometheusConfig.class)
-                .setPrometheusURI(null)
-                .setQueryChunkSizeDuration(null)
-                .setMaxQueryRangeDuration(null));
+        assertRecordedDefaults(recordDefaults(PrometheusConnectorConfig.class)
+                .setPrometheusURI(new URI("http://localhost:9090"))
+                .setQueryChunkSizeDuration("1d")
+                .setMaxQueryRangeDuration("21d")
+                .setCacheDuration("30s"));
     }
 
     @Test
     public void testExplicitPropertyMappings()
+            throws Exception
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("prometheus-uri", "file://test.json")
-                .put("query-chunk-size-duration", "1d")
-                .put("max-query-range-duration", "3w")
+                .put("query-chunk-size-duration", "1y")
+                .put("max-query-range-duration", "3y")
+                .put("cache-duration", "60s")
                 .build();
 
         URI uri = URI.create("file://test.json");
-        PrometheusConfig expected = new PrometheusConfig();
+        PrometheusConnectorConfig expected = new PrometheusConnectorConfig();
         expected.setPrometheusURI(uri);
-        expected.setQueryChunkSizeDuration("1d");
-        expected.setMaxQueryRangeDuration("3w");
+        expected.setQueryChunkSizeDuration("1y");
+        expected.setMaxQueryRangeDuration("3y");
+        expected.setCacheDuration("60s");
 
         assertFullMapping(properties, expected);
     }

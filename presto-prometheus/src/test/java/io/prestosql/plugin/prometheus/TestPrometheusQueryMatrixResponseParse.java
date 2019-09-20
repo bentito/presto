@@ -20,6 +20,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 
@@ -53,7 +54,7 @@ public class TestPrometheusQueryMatrixResponseParse
             throws IOException
     {
         List<PrometheusMetricResult> results = new PrometheusQueryResponseParse(promMatrixResponse).getResults();
-        assertEquals(results.get(0).getTimeSeriesValues().values.get(0).timestamp, Instant.ofEpochSecond(1565962969, 44 * 1000000));
+        assertEquals(results.get(0).getTimeSeriesValues().values.get(0).timestamp, Timestamp.from(Instant.ofEpochSecond(1565962969, 44 * 1000000)));
     }
 
     @Test

@@ -13,17 +13,30 @@
  */
 package io.prestosql.plugin.prometheus;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
-import java.sql.Timestamp;
-
-@JsonFormat(shape = JsonFormat.Shape.ARRAY)
-public class PrometheusTimeSeriesValue
+/**
+ * allow for settable Clock for testing
+ */
+public class PrometheusTimeMachine
 {
-    @JsonDeserialize(using = PrometheusTimestampDeserializer.class)
-    public Timestamp timestamp;
-    @JsonProperty
-    public String value;
+    private static Clock clock = Clock.systemDefaultZone();
+    private static ZoneId zoneId = ZoneId.systemDefault();
+
+    public static LocalDateTime now()
+    {
+        return LocalDateTime.now(getClock());
+    }
+
+    public static void useFixedClockAt(LocalDateTime date)
+    {
+        clock = Clock.fixed(date.atZone(zoneId).toInstant(), zoneId);
+    }
+
+    private static Clock getClock()
+    {
+        return clock;
+    }
 }

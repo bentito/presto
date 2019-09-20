@@ -15,13 +15,15 @@ package io.prestosql.plugin.prometheus;
 
 import io.prestosql.spi.block.Block;
 
+import java.sql.Timestamp;
+
 public class PrometheusStandardizedRow
 {
     Block labels;
-    Double timestamp;
+    Timestamp timestamp;
     Double value;
 
-    public PrometheusStandardizedRow(Block labels, Double timestamp, Double value)
+    public PrometheusStandardizedRow(Block labels, Timestamp timestamp, Double value)
     {
         this.labels = labels;
         this.timestamp = timestamp;

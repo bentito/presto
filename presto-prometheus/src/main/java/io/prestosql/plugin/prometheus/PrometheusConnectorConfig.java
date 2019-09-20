@@ -14,16 +14,23 @@
 package io.prestosql.plugin.prometheus;
 
 import io.airlift.configuration.Config;
+import io.airlift.configuration.ConfigDescription;
 
 import javax.validation.constraints.NotNull;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 
-public class PrometheusConfig
+public class PrometheusConnectorConfig
 {
-    private URI prometheusURI;
-    private String queryChunkSizeDuration;
-    private String maxQueryRangeDuration;
+    private URI prometheusURI = new URI("http://localhost:9090");
+    private String queryChunkSizeDuration = "1d";
+    private String maxQueryRangeDuration = "21d";
+    private String cacheDuration = "30s";
+
+    public PrometheusConnectorConfig()
+            throws URISyntaxException
+    {}
 
     @NotNull
     public URI getPrometheusURI()
@@ -32,7 +39,8 @@ public class PrometheusConfig
     }
 
     @Config("prometheus-uri")
-    public PrometheusConfig setPrometheusURI(URI prometheusURI)
+    @ConfigDescription("Where to find Prometheus coordinator host")
+    public PrometheusConnectorConfig setPrometheusURI(URI prometheusURI)
     {
         this.prometheusURI = prometheusURI;
         return this;
@@ -45,7 +53,8 @@ public class PrometheusConfig
     }
 
     @Config("query-chunk-size-duration")
-    public PrometheusConfig setQueryChunkSizeDuration(String queryChunkSizeDuration)
+    @ConfigDescription("The duration of each query to Prometheus")
+    public PrometheusConnectorConfig setQueryChunkSizeDuration(String queryChunkSizeDuration)
     {
         this.queryChunkSizeDuration = queryChunkSizeDuration;
         return this;
@@ -58,9 +67,24 @@ public class PrometheusConfig
     }
 
     @Config("max-query-range-duration")
-    public PrometheusConfig setMaxQueryRangeDuration(String maxQueryRangeDuration)
+    @ConfigDescription("Width of overall query to Prometheus, will be divided into query-chunk-size-duration queries")
+    public PrometheusConnectorConfig setMaxQueryRangeDuration(String maxQueryRangeDuration)
     {
         this.maxQueryRangeDuration = maxQueryRangeDuration;
+        return this;
+    }
+
+    @NotNull
+    public String getCacheDuration()
+    {
+        return cacheDuration;
+    }
+
+    @Config("cache-duration")
+    @ConfigDescription("How long values in this config are cached")
+    public PrometheusConnectorConfig setCacheDuration(String cacheConfigDuration)
+    {
+        this.cacheDuration = cacheConfigDuration;
         return this;
     }
 }
