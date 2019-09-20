@@ -19,6 +19,7 @@ import com.google.common.io.ByteSource;
 import com.google.common.io.CountingInputStream;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.RecordCursor;
@@ -29,6 +30,7 @@ import io.prestosql.spi.type.VarcharType;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -37,7 +39,9 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 
 public class PrometheusRecordCursor
@@ -121,11 +125,16 @@ public class PrometheusRecordCursor
         return true;
     }
 
-    //TODO understand why timestamp fields are using getLong() to resolve the value
     @Override
     public long getLong(int field)
     {
-        return Math.round((double) getFieldValue(field));
+        Type type = getType(field);
+        if (type.equals(TIMESTAMP)) {
+            return ((Timestamp) getFieldValue(field)).toInstant().toEpochMilli();
+        }
+        else {
+            throw new PrestoException(NOT_SUPPORTED, "Unsupported type " + getType(field));
+        }
     }
 
     @Override
@@ -174,7 +183,7 @@ public class PrometheusRecordCursor
                 result.getTimeSeriesValues().values.stream().map(prometheusTimeSeriesValue ->
                         new PrometheusStandardizedRow(
                                 getBlockFromMap(columnHandles.get(0).getColumnType(), metricHeaderToMap(result.getMetricHeader())),
-                                (double) prometheusTimeSeriesValue.timestamp.toEpochMilli(),
+                                prometheusTimeSeriesValue.timestamp,
                                 Double.parseDouble(prometheusTimeSeriesValue.value)))
                         .collect(Collectors.toList()))
                 .flatMap(List::stream)

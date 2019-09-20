@@ -18,6 +18,8 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
+import com.google.inject.ConfigurationException;
+import com.google.inject.spi.Message;
 import io.airlift.json.JsonCodec;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
@@ -35,38 +37,52 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static io.prestosql.plugin.prometheus.PrometheusSplitManager.timeUnitsToSeconds;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class PrometheusClient
 {
-    // schema name is fixed to "prometheus"
-    private final Supplier<Map<String, Object>> tables;
-    protected final PrometheusConfig config;
+    // schema name is fixed to "default"
+    private final Supplier<Map<String, Object>> tableSupplier;
+    protected final PrometheusConnectorConfig config;
     private static TypeManager typeManager;
     protected static final String METRICS_ENDPOINT = "/api/v1/label/__name__/values";
+    static List<PrometheusColumn> prometheusColumns;
 
     @Inject
-    public PrometheusClient(PrometheusConfig config, JsonCodec<Map<String, Object>> metricCodec, TypeManager typeManager)
+    public PrometheusClient(PrometheusConnectorConfig config, JsonCodec<Map<String, Object>> metricCodec, TypeManager typeManager)
             throws URISyntaxException
     {
         requireNonNull(config, "config is null");
         requireNonNull(metricCodec, "metricCodec is null");
         requireNonNull(typeManager, "typeManager is null");
 
-        tables = Suppliers.memoize(metricsSupplier(metricCodec, getPrometheusMetricsURI(config)));
+        long maxQueryRangeDuration = timeUnitsToSeconds(config.getMaxQueryRangeDuration());
+        long queryChunkSizeDuration = timeUnitsToSeconds(config.getQueryChunkSizeDuration());
+        if (maxQueryRangeDuration < queryChunkSizeDuration) {
+            throw new ConfigurationException(ImmutableList.of(new Message("max-query-range-duration must be greater than query-chunk-size-duration")));
+        }
+
+        tableSupplier = Suppliers.memoizeWithExpiration(metricsSupplier(metricCodec, getPrometheusMetricsURI(config)),
+                timeUnitsToSeconds(config.getCacheDuration()), TimeUnit.SECONDS);
         this.config = config;
         this.typeManager = typeManager;
+        this.prometheusColumns = ImmutableList.of(
+                new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
+                new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
+                new PrometheusColumn("value", DoubleType.DOUBLE));
     }
 
     public Set<String> getSchemaNames()
     {
-        return ImmutableSet.of("prometheus");
+        return ImmutableSet.of("default");
     }
 
-    private URI getPrometheusMetricsURI(PrometheusConfig config)
+    private URI getPrometheusMetricsURI(PrometheusConnectorConfig config)
             throws URISyntaxException
     {
         // endpoint to retrieve metric names from Prometheus
@@ -81,10 +97,10 @@ public class PrometheusClient
     public Set<String> getTableNames(String schema)
     {
         requireNonNull(schema, "schema is null");
-        if (schema.equals("prometheus")) {
-            String status = (String) tables.get().get("status");
+        if (schema.equals("default")) {
+            String status = (String) tableSupplier.get().get("status");
             if (status.equals("success")) {
-                List<String> tableNames = (List<String>) tables.get().get("data");
+                List<String> tableNames = (List<String>) tableSupplier.get().get("data");
                 if (tableNames == null) {
                     return ImmutableSet.of();
                 }
@@ -102,8 +118,8 @@ public class PrometheusClient
     {
         requireNonNull(schema, "schema is null");
         requireNonNull(tableName, "tableName is null");
-        if (schema.equals("prometheus")) {
-            List<String> tableNames = (List<String>) tables.get().get("data");
+        if (schema.equals("default")) {
+            List<String> tableNames = (List<String>) tableSupplier.get().get("data");
             if (tableNames == null) {
                 return null;
             }
@@ -112,10 +128,7 @@ public class PrometheusClient
             }
             PrometheusTable table = new PrometheusTable(
                     tableName,
-                    ImmutableList.of(
-                            new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
-                            new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
-                            new PrometheusColumn("value", DoubleType.DOUBLE)));
+                    prometheusColumns);
             return table;
         }
         else {

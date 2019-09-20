@@ -21,6 +21,7 @@ import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
@@ -30,6 +31,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -56,22 +59,26 @@ public class TestPrometheusRecordSetProvider
         RecordSet recordSet = recordSetProvider.getRecordSet(PrometheusTransactionHandle.INSTANCE, SESSION,
                 new PrometheusSplit(dataUri), tableHandle, ImmutableList.of(
                         new PrometheusColumnHandle("labels", MetadataUtil.mapType(createUnboundedVarcharType(), createUnboundedVarcharType()), 0),
-                        new PrometheusColumnHandle("timestamp", DoubleType.DOUBLE, 1),
+                        new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 1),
                         new PrometheusColumnHandle("value", DoubleType.DOUBLE, 2)));
         assertNotNull(recordSet, "recordSet is null");
 
         RecordCursor cursor = recordSet.cursor();
         assertNotNull(cursor, "cursor is null");
 
-        Map<Double, Map> actual = new LinkedHashMap<>();
+        Map<Timestamp, Map> actual = new LinkedHashMap<>();
         while (cursor.advanceNextPosition()) {
-            actual.put(cursor.getDouble(1), (Map) getMapFromBlock(varcharMapType, (Block) cursor.getObject(0)));
+            actual.put((Timestamp) cursor.getObject(1), (Map) getMapFromBlock(varcharMapType, (Block) cursor.getObject(0)));
         }
-        Map<Double, Map> expected = ImmutableMap.<Double, Map>builder()
-                .put(1565962969.044 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
-                .put(1565962984.045 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
-                .put(1565962999.044 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
-                .put(1565963014.044 * 1000, ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus"))
+        Map<Timestamp, Map> expected = ImmutableMap.<Timestamp, Map>builder()
+                .put(Timestamp.from(Instant.ofEpochMilli(1565962969044L)), ImmutableMap.of("instance",
+                        "localhost:9090", "__name__", "up", "job", "prometheus"))
+                .put(Timestamp.from(Instant.ofEpochMilli(1565962984045L)), ImmutableMap.of("instance",
+                        "localhost:9090", "__name__", "up", "job", "prometheus"))
+                .put(Timestamp.from(Instant.ofEpochMilli(1565962999044L)), ImmutableMap.of("instance",
+                        "localhost:9090", "__name__", "up", "job", "prometheus"))
+                .put(Timestamp.from(Instant.ofEpochMilli(1565963014044L)), ImmutableMap.of("instance",
+                        "localhost:9090", "__name__", "up", "job", "prometheus"))
                 .build();
         assertEquals(actual, expected);
     }

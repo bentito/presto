@@ -31,6 +31,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -80,19 +82,19 @@ public class TestPrometheusRecordSet
     {
         RecordSet recordSet = new PrometheusRecordSet(new PrometheusSplit(dataUri), ImmutableList.of(
                 new PrometheusColumnHandle("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)")), 0),
-                new PrometheusColumnHandle("timestamp", DoubleType.DOUBLE, 1),
+                new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 1),
                 new PrometheusColumnHandle("value", DoubleType.DOUBLE, 2)));
         RecordCursor cursor = recordSet.cursor();
 
         assertEquals(cursor.getType(0), TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)")));
-        assertEquals(cursor.getType(1), DoubleType.DOUBLE);
+        assertEquals(cursor.getType(1), TimestampType.TIMESTAMP);
         assertEquals(cursor.getType(2), DoubleType.DOUBLE);
 
         List<PrometheusStandardizedRow> actual = new ArrayList<>();
         while (cursor.advanceNextPosition()) {
             actual.add(new PrometheusStandardizedRow(
                     (Block) cursor.getObject(0),
-                    cursor.getDouble(1),
+                    (Timestamp) cursor.getObject(1),
                     cursor.getDouble(2)));
             assertFalse(cursor.isNull(0));
             assertFalse(cursor.isNull(1));
@@ -100,13 +102,13 @@ public class TestPrometheusRecordSet
         }
         List<PrometheusStandardizedRow> expected = ImmutableList.<PrometheusStandardizedRow>builder()
                 .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
-                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565962969.044 * 1000, 1.0))
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), Timestamp.from(Instant.ofEpochMilli(1565962969044L)), 1.0))
                 .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
-                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565962984.045 * 1000, 1.0))
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), Timestamp.from(Instant.ofEpochMilli(1565962984045L)), 1.0))
                 .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
-                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565962999.044 * 1000, 1.0))
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), Timestamp.from(Instant.ofEpochMilli(1565962999044L)), 1.0))
                 .add(new PrometheusStandardizedRow(getBlockFromMap(varcharMapType,
-                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), 1565963014.044 * 1000, 1.0))
+                        ImmutableMap.of("instance", "localhost:9090", "__name__", "up", "job", "prometheus")), Timestamp.from(Instant.ofEpochMilli(1565963014044L)), 1.0))
                 .build();
         List<PairLike<PrometheusStandardizedRow, PrometheusStandardizedRow>> pairs = Streams.zip(actual.stream(), expected.stream(), PairLike::new)
                 .collect(Collectors.toList());
