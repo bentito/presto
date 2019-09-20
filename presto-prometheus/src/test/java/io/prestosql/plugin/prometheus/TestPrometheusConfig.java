@@ -32,7 +32,8 @@ public class TestPrometheusConfig
     {
         assertRecordedDefaults(recordDefaults(PrometheusConfig.class)
                 .setPrometheusURI(null)
-                .setQueryChunkSizeDuration(null));
+                .setQueryChunkSizeDuration(null)
+                .setMaxQueryRangeDuration(null));
     }
 
     @Test
@@ -40,13 +41,15 @@ public class TestPrometheusConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("prometheus-uri", "file://test.json")
-                .put("query-chunk-size-duration", "365d")
+                .put("query-chunk-size-duration", "1d")
+                .put("max-query-range-duration", "3w")
                 .build();
 
         URI uri = URI.create("file://test.json");
         PrometheusConfig expected = new PrometheusConfig();
         expected.setPrometheusURI(uri);
-        expected.setQueryChunkSizeDuration("365d");
+        expected.setQueryChunkSizeDuration("1d");
+        expected.setMaxQueryRangeDuration("3w");
 
         assertFullMapping(properties, expected);
     }

@@ -23,6 +23,7 @@ public class PrometheusConfig
 {
     private URI prometheusURI;
     private String queryChunkSizeDuration;
+    private String maxQueryRangeDuration;
 
     @NotNull
     public URI getPrometheusURI()
@@ -47,6 +48,19 @@ public class PrometheusConfig
     public PrometheusConfig setQueryChunkSizeDuration(String queryChunkSizeDuration)
     {
         this.queryChunkSizeDuration = queryChunkSizeDuration;
+        return this;
+    }
+
+    @NotNull
+    public String getMaxQueryRangeDuration()
+    {
+        return maxQueryRangeDuration;
+    }
+
+    @Config("max-query-range-duration")
+    public PrometheusConfig setMaxQueryRangeDuration(String maxQueryRangeDuration)
+    {
+        this.maxQueryRangeDuration = maxQueryRangeDuration;
         return this;
     }
 }
