@@ -27,6 +27,7 @@ public class PrometheusConnectorConfig
     private String queryChunkSizeDuration = "1d";
     private String maxQueryRangeDuration = "21d";
     private String cacheDuration = "30s";
+    private String bearerTokenFile;
 
     public PrometheusConnectorConfig()
             throws URISyntaxException
@@ -85,6 +86,19 @@ public class PrometheusConnectorConfig
     public PrometheusConnectorConfig setCacheDuration(String cacheConfigDuration)
     {
         this.cacheDuration = cacheConfigDuration;
+        return this;
+    }
+
+    public String getBearerTokenFile()
+    {
+        return bearerTokenFile;
+    }
+
+    @Config("bearer-token-file")
+    @ConfigDescription("File holding bearer token if needed for access to Prometheus")
+    public PrometheusConnectorConfig setBearerTokenFile(String bearerTokenFile)
+    {
+        this.bearerTokenFile = bearerTokenFile;
         return this;
     }
 }
