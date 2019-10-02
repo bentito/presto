@@ -15,11 +15,11 @@ package io.prestosql.plugin.prometheus;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
-import com.google.common.io.Resources;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.type.Type;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.List;
 
@@ -30,7 +30,7 @@ public class PrometheusRecordSet
 {
     private final List<PrometheusColumnHandle> columnHandles;
     private final List<Type> columnTypes;
-    private final ByteSource byteSource;
+    private ByteSource byteSource;
 
     public PrometheusRecordSet(PrometheusSplit split, List<PrometheusColumnHandle> columnHandles)
     {
@@ -44,10 +44,13 @@ public class PrometheusRecordSet
         this.columnTypes = types.build();
 
         try {
-            byteSource = Resources.asByteSource(split.getUri().toURL());
+            byteSource = ByteSource.wrap(PrometheusClient.getHttpResponse(split.getUri()).bytes());
         }
         catch (MalformedURLException e) {
             throw new RuntimeException(e);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
