@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 public class PrometheusTimestampDeserializer
         extends JsonDeserializer<Timestamp>
@@ -31,10 +33,17 @@ public class PrometheusTimestampDeserializer
     {
         String timestamp = jp.getText().trim();
         try {
-            return Timestamp.from(Instant.ofEpochMilli((long) (Double.parseDouble(timestamp) * 1000)));
+            return decimalEpochTimestampToSQLTimestamp(timestamp);
         }
         catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    static Timestamp decimalEpochTimestampToSQLTimestamp(String timestamp)
+    {
+        long promTimestampMillis = (long) (Double.parseDouble(timestamp) * 1000);
+        ZonedDateTime zonedDateTimeFromPrometheusDecimalTimestamp = Instant.ofEpochMilli(promTimestampMillis).atZone(ZoneId.systemDefault());
+        return new Timestamp(zonedDateTimeFromPrometheusDecimalTimestamp.toInstant().toEpochMilli());
     }
 }
