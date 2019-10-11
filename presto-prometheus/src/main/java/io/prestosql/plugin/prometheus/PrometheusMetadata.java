@@ -23,6 +23,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
+import io.prestosql.spi.connector.Constraint;
+import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.TableNotFoundException;
@@ -166,5 +168,12 @@ public class PrometheusMetadata
     public ConnectorTableProperties getTableProperties(ConnectorSession session, ConnectorTableHandle table)
     {
         return new ConnectorTableProperties();
+    }
+
+    @Override
+    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint)
+    {
+        prometheusClient.setPredicate(Optional.of(constraint.getSummary()));
+        return Optional.empty();
     }
 }

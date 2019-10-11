@@ -14,29 +14,43 @@
 package io.prestosql.plugin.prometheus;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.airlift.json.JsonCodec;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableHandle;
+import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.Range;
+import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.predicate.ValueSet;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.type.InternalTypeManager;
 import org.apache.http.NameValuePair;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAmount;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static io.airlift.json.JsonCodec.jsonCodec;
@@ -44,12 +58,14 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.METRIC_CODEC;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.OFFSET_MILLIS;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.decimalSecondString;
+import static io.prestosql.plugin.prometheus.PrometheusSplitManager.longFromDecimalSecondString;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.timeUnitsToMillis;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.timeUnitsToSeconds;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
 import static java.time.LocalDateTime.ofInstant;
 import static org.apache.http.client.utils.URLEncodedUtils.parse;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 
 public class TestPrometheusSplit
 {
@@ -59,12 +75,24 @@ public class TestPrometheusSplit
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
     static final int NUMBER_MORE_THAN_EXPECTED_NUMBER_SPLITS = 100;
+    PrometheusTable prometheusTable;
 
     @BeforeClass
     public void setUp()
             throws Exception
     {
         prometheusHttpServer = new PrometheusHttpServer();
+    }
+
+    @BeforeMethod
+    public void resetTable()
+            throws Exception
+    {
+        prometheusTable = new PrometheusTable("tableName",
+                ImmutableList.of(
+                        new PrometheusColumn("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar,varchar)"))),
+                        new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
+                        new PrometheusColumn("value", DoubleType.DOUBLE)));
     }
 
     @AfterClass(alwaysRun = true)
@@ -117,7 +145,7 @@ public class TestPrometheusSplit
             throws URISyntaxException
     {
         PrometheusConnectorConfig config = new PrometheusConnectorConfig();
-        LocalDateTime now = java.time.LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
+        LocalDateTime now = LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
         PrometheusTimeMachine.useFixedClockAt(now);
 
         dataUri = prometheusHttpServer.resolve("/prometheus-data/prom-metrics-non-standard-name.json");
@@ -150,7 +178,7 @@ public class TestPrometheusSplit
     {
         PrometheusConnectorConfig config = new PrometheusConnectorConfig();
         dataUri = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
-        LocalDateTime now = java.time.LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
+        LocalDateTime now = LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
         PrometheusTimeMachine.useFixedClockAt(now);
 
         config.setPrometheusURI(dataUri);
@@ -183,7 +211,7 @@ public class TestPrometheusSplit
         PrometheusConnectorConfig config = new PrometheusConnectorConfig();
         dataUri = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
         config.setPrometheusURI(dataUri);
-        LocalDateTime now = java.time.LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
+        LocalDateTime now = LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
         PrometheusTimeMachine.useFixedClockAt(now);
 
         config.setMaxQueryRangeDuration("21d");
@@ -267,7 +295,7 @@ public class TestPrometheusSplit
         LocalDateTime now = ofInstant(Instant.ofEpochMilli(1000000000L), ZoneId.systemDefault());
         PrometheusTimeMachine.useFixedClockAt(now);
 
-        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr);
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
         List<String> expectedSplitTimes = ImmutableList.of(
                 "827199.998", "913599.999", "1000000");
         assertEquals(splitTimes, expectedSplitTimes);
@@ -282,7 +310,7 @@ public class TestPrometheusSplit
         LocalDateTime now = ofInstant(Instant.ofEpochMilli(1000000000L), ZoneId.systemDefault());
         PrometheusTimeMachine.useFixedClockAt(now);
 
-        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr);
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
         List<String> expectedSplitTimes = ImmutableList.of(
                 "827199.999", "1000000");
         assertEquals(splitTimes, expectedSplitTimes);
@@ -297,7 +325,7 @@ public class TestPrometheusSplit
         LocalDateTime now = ofInstant(Instant.ofEpochMilli(1568638172000L), ZoneId.systemDefault());
         PrometheusTimeMachine.useFixedClockAt(now);
 
-        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr);
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
         List<String> promTimesReturned = mockPrometheusResponseToChunkedQueries(queryChunkSizeDurationStr, splitTimes);
         assertEquals(promTimesReturned, convertMockTimesToStrings(promTimeValuesMock));
     }
@@ -311,9 +339,8 @@ public class TestPrometheusSplit
         LocalDateTime now = ofInstant(Instant.ofEpochMilli(1568638171999L), ZoneId.systemDefault());
         PrometheusTimeMachine.useFixedClockAt(now);
 
-        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr);
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
         List<String> promTimesReturned = mockPrometheusResponseToChunkedQueries(queryChunkSizeDurationStr, splitTimes);
-        System.out.println(promTimesReturned);
         assertEquals(promTimesReturned, convertMockTimesToStrings(promTimeValuesMock));
     }
 
@@ -348,6 +375,141 @@ public class TestPrometheusSplit
         List<String> expectedResponse = ImmutableList.of("1568638112", "1568638126.997", "1568638142", "1568638157", "1568638171.999");
         List<String> splitTimes = ImmutableList.of("1568638141.999", "1568638172.");
         assertEquals(mockPrometheusResponseToChunkedQueries("30s", splitTimes), expectedResponse);
+    }
+
+    @Test
+    public void testPredicatePushDownLowerBoundDirect()
+            throws Exception
+    {
+        Range lowRange = Range.greaterThanOrEqual(TimestampType.TIMESTAMP, 1570460709643L);
+        ValueSet valueSet = ValueSet.ofRanges(lowRange);
+        Domain testDomain = Domain.create(valueSet, false);
+        TupleDomain<ColumnHandle> testTupleDomain = TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
+                (ColumnHandle) new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 2), testDomain));
+        prometheusTable.setPredicate(Optional.of(testTupleDomain));
+        Optional<PrometheusPredicateTimeInfo> predicateTimes = PrometheusSplitManager.determinePredicateTimes(testTupleDomain);
+        ZonedDateTime expected = ZonedDateTime.ofInstant(Instant.ofEpochMilli(1570460709643L), ZoneId.systemDefault());
+        assertEquals(predicateTimes.get().predicateLowerTimeBound.get(), expected);
+    }
+
+    @Test
+    public void testPredicatePushDownSetsLowerBoundOnly()
+            throws Exception
+    {
+        long predicateLowValue = 1568638171999L - 600000L;
+        Range lowRange = Range.greaterThanOrEqual(TimestampType.TIMESTAMP, predicateLowValue);
+        ValueSet valueSet = ValueSet.ofRanges(lowRange);
+        Domain testDomain = Domain.create(valueSet, false);
+        TupleDomain<ColumnHandle> testTupleDomain = TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
+                (ColumnHandle) new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 2), testDomain));
+        prometheusTable.setPredicate(Optional.of(testTupleDomain));
+        String maxQueryRangeDurationStr = "120s";
+        String queryChunkSizeDurationStr = "30s";
+        LocalDateTime now = ofInstant(Instant.ofEpochMilli(1568638171999L), ZoneId.systemDefault());
+        PrometheusTimeMachine.useFixedClockAt(now);
+        TemporalAmount maxQueryAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis(maxQueryRangeDurationStr));
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
+
+        String earliestSplit = splitTimes.get(0);
+        ZonedDateTime earliestSplitAsTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longFromDecimalSecondString(earliestSplit)), ZoneId.systemDefault());
+        TemporalAmount queryChunkAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis(queryChunkSizeDurationStr));
+        ZonedDateTime startOfQuery = earliestSplitAsTime.minus(queryChunkAsTime);
+        assertNotEquals(startOfQuery.toLocalDateTime(), now.minus(maxQueryAsTime).minus(java.time.Duration.ofMillis((splitTimes.size() - 1) * OFFSET_MILLIS)));
+        assertEquals(startOfQuery.toInstant().toEpochMilli(), Instant.ofEpochMilli(predicateLowValue).toEpochMilli() - ((splitTimes.size() - 1) * OFFSET_MILLIS));
+    }
+
+    @Test
+    public void testPredicatePushDownSetsUpperBoundOnly()
+            throws Exception
+    {
+        long predicateHighValue = 1568638171999L;
+        Range highRange = Range.lessThanOrEqual(TimestampType.TIMESTAMP, predicateHighValue);
+        ValueSet valueSet = ValueSet.ofRanges(highRange);
+
+        Domain testDomain = Domain.create(valueSet, false);
+        TupleDomain<ColumnHandle> testTupleDomain = TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
+                (ColumnHandle) new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 2), testDomain));
+        prometheusTable.setPredicate(Optional.of(testTupleDomain));
+        String maxQueryRangeDurationStr = "120s";
+        String queryChunkSizeDurationStr = "30s";
+        LocalDateTime now = ofInstant(Instant.ofEpochMilli(1568638171999L + 600000L), ZoneId.systemDefault());
+        PrometheusTimeMachine.useFixedClockAt(now);
+
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
+
+        TemporalAmount expectedMaxQueryAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis(maxQueryRangeDurationStr) +
+                ((splitTimes.size() - 1) * OFFSET_MILLIS));
+        String lastSplit = splitTimes.get(splitTimes.size() - 1);
+        ZonedDateTime lastSplitAsTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longFromDecimalSecondString(lastSplit)), ZoneId.systemDefault());
+        String earliestSplit = splitTimes.get(0);
+        ZonedDateTime earliestSplitAsTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longFromDecimalSecondString(earliestSplit)), ZoneId.systemDefault());
+        TemporalAmount queryChunkAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis(queryChunkSizeDurationStr));
+        java.time.Duration actualMaxDuration = Duration.between(earliestSplitAsTime
+                .minus(queryChunkAsTime), lastSplitAsTime);
+
+        assertEquals(lastSplitAsTime.toInstant().toEpochMilli(), 1568638171999L);
+        assertEquals(actualMaxDuration, expectedMaxQueryAsTime);
+    }
+
+    @Test
+    public void testPredicatePushDownSetsUpperAndLowerBound()
+            throws Exception
+    {
+        long predicateHighValue = 1568638171999L;
+        Range highRange = Range.equal(TimestampType.TIMESTAMP, predicateHighValue);
+        long predicateLowValue = 1568638171999L - 600000L;
+        Range lowRange = Range.equal(TimestampType.TIMESTAMP, predicateLowValue);
+        ValueSet valueSet = ValueSet.ofRanges(lowRange, highRange);
+
+        Domain testDomain = Domain.create(valueSet, false);
+        TupleDomain<ColumnHandle> testTupleDomain = TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
+                (ColumnHandle) new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 2), testDomain));
+        prometheusTable.setPredicate(Optional.of(testTupleDomain));
+        String maxQueryRangeDurationStr = "120s";
+        String queryChunkSizeDurationStr = "30s";
+        LocalDateTime now = ofInstant(Instant.ofEpochMilli(1568638171999L + 1200000L), ZoneId.systemDefault());
+        PrometheusTimeMachine.useFixedClockAt(now);
+
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
+
+        TemporalAmount expectedMaxQueryAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis("10m") +
+                ((splitTimes.size() - 1) * OFFSET_MILLIS));
+        String lastSplit = splitTimes.get(splitTimes.size() - 1);
+        ZonedDateTime lastSplitAsTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longFromDecimalSecondString(lastSplit)), ZoneId.systemDefault());
+        String earliestSplit = splitTimes.get(0);
+        ZonedDateTime earliestSplitAsTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longFromDecimalSecondString(earliestSplit)), ZoneId.systemDefault());
+        TemporalAmount queryChunkAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis(queryChunkSizeDurationStr));
+        java.time.Duration actualMaxDuration = Duration.between(earliestSplitAsTime
+                .minus(queryChunkAsTime), lastSplitAsTime);
+
+        assertEquals(lastSplitAsTime.toInstant().toEpochMilli(), 1568638171999L);
+        assertEquals(actualMaxDuration, expectedMaxQueryAsTime);
+    }
+
+    @Test
+    public void testEmptyPredicatePredicatePushDown()
+            throws Exception
+    {
+        long predicateLowValue = 1570460709643L;
+        Range lowRange = Range.greaterThanOrEqual(TimestampType.TIMESTAMP, predicateLowValue);
+        ValueSet valueSet = ValueSet.ofRanges(lowRange);
+        Domain testDomain = Domain.create(valueSet, false);
+        TupleDomain<ColumnHandle> testTupleDomain = TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
+                (ColumnHandle) new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 2), testDomain));
+        prometheusTable.setPredicate(Optional.empty());
+        String maxQueryRangeDurationStr = "120s";
+        String queryChunkSizeDurationStr = "30s";
+        LocalDateTime now = ofInstant(Instant.ofEpochMilli(1568638171999L), ZoneId.systemDefault());
+        PrometheusTimeMachine.useFixedClockAt(now);
+        TemporalAmount maxQueryAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis(maxQueryRangeDurationStr));
+        List<String> splitTimes = PrometheusSplitManager.generateTimesForSplits(now, maxQueryRangeDurationStr, queryChunkSizeDurationStr, prometheusTable);
+
+        String earliestSplit = splitTimes.get(0);
+        ZonedDateTime earliestSplitAsTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longFromDecimalSecondString(earliestSplit)), ZoneId.systemDefault());
+        TemporalAmount queryChunkAsTime = java.time.Duration.ofMillis(PrometheusSplitManager.timeUnitsToMillis(queryChunkSizeDurationStr));
+        ZonedDateTime startOfQuery = earliestSplitAsTime.minus(queryChunkAsTime);
+        assertEquals(startOfQuery.toLocalDateTime(), now.minus(maxQueryAsTime).minus(java.time.Duration.ofMillis((splitTimes.size() - 1) * OFFSET_MILLIS)));
+        assertNotEquals(startOfQuery.toInstant().toEpochMilli(), Instant.ofEpochMilli(predicateLowValue).toEpochMilli());
     }
 
     /**

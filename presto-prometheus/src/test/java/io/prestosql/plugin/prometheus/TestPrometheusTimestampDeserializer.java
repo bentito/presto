@@ -26,10 +26,8 @@ public class TestPrometheusTimestampDeserializer
     public void testDeserializeTimestamp()
     {
         ZonedDateTime now = ZonedDateTime.now();
-        String nowEpochInSecondsStr = String.valueOf(now.toInstant().getEpochSecond());
-        long nowEpochNanos = now.toInstant().getNano();
-        String nowEpochMillisStr = String.valueOf(nowEpochNanos).substring(0, 3);
-        String nowTimeStr = nowEpochInSecondsStr + "." + nowEpochMillisStr;
+        long nowEpochMillis = now.toInstant().toEpochMilli();
+        String nowTimeStr = PrometheusSplitManager.decimalSecondString(nowEpochMillis);
         Timestamp nowTimestampActual = PrometheusTimestampDeserializer.decimalEpochTimestampToSQLTimestamp(nowTimeStr);
         assertEquals(nowTimestampActual,
                 new Timestamp(now.toInstant().toEpochMilli()));

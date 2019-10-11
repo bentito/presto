@@ -1,25 +1,20 @@
 /*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  *     http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
 package io.prestosql.plugin.prometheus;
 
 import java.time.ZonedDateTime;
 import java.util.Optional;
-
-import static java.util.Objects.requireNonNull;
 
 public class PrometheusPredicateTimeInfo
 {
@@ -54,9 +49,8 @@ public class PrometheusPredicateTimeInfo
 
     public static final class Builder
     {
-
-        Optional<ZonedDateTime> predicateLowerTimeBound;
-        Optional<ZonedDateTime> predicateUpperTimeBound;
+        Optional<ZonedDateTime> predicateLowerTimeBound = Optional.empty();
+        Optional<ZonedDateTime> predicateUpperTimeBound = Optional.empty();
 
         public Builder()
         {
@@ -71,8 +65,6 @@ public class PrometheusPredicateTimeInfo
 
         public PrometheusPredicateTimeInfo build()
         {
-            requireNonNull(predicateLowerTimeBound, "must set a lower time bound for predicate time info");
-            requireNonNull(predicateUpperTimeBound, "must set a upper time bound for predicate time info");
             return new PrometheusPredicateTimeInfo(this);
         }
     }
