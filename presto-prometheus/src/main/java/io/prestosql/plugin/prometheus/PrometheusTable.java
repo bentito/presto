@@ -16,9 +16,12 @@ package io.prestosql.plugin.prometheus;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -29,6 +32,7 @@ public class PrometheusTable
     private final String name;
     private List<PrometheusColumn> columns;
     private List<ColumnMetadata> columnsMetadata;
+    private Optional<TupleDomain<ColumnHandle>> predicate = Optional.empty();
 
     @JsonCreator
     public PrometheusTable(
@@ -60,5 +64,15 @@ public class PrometheusTable
     public List<ColumnMetadata> getColumnsMetadata()
     {
         return columnsMetadata;
+    }
+
+    public Optional<TupleDomain<ColumnHandle>> getPredicate()
+    {
+        return this.predicate;
+    }
+
+    public void setPredicate(Optional<TupleDomain<ColumnHandle>> predicate)
+    {
+        this.predicate = predicate;
     }
 }
