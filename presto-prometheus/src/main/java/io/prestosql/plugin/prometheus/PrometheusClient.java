@@ -22,6 +22,8 @@ import com.google.inject.ConfigurationException;
 import com.google.inject.spi.Message;
 import io.airlift.json.JsonCodec;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
@@ -60,6 +62,7 @@ public class PrometheusClient
     private static TypeManager typeManager;
     protected static final String METRICS_ENDPOINT = "/api/v1/label/__name__/values";
     static List<PrometheusColumn> prometheusColumns;
+    private Optional<TupleDomain<ColumnHandle>> pushedDown = Optional.empty();
     private static final OkHttpClient httpClient = new OkHttpClient.Builder()
             .build();
 
@@ -139,6 +142,7 @@ public class PrometheusClient
             PrometheusTable table = new PrometheusTable(
                     tableName,
                     prometheusColumns);
+            pushedDown.ifPresent(pushedDownPredicate -> table.setPredicate(Optional.of(pushedDownPredicate)));
             return table;
         }
         else {
@@ -165,6 +169,11 @@ public class PrometheusClient
         Map<String, Object> metrics = metricsCodec.fromJson(json);
 
         return metrics;
+    }
+
+    protected void setPredicate(Optional<TupleDomain<ColumnHandle>> pushedDown)
+    {
+        this.pushedDown = pushedDown;
     }
 
     static ResponseBody getHttpResponse(URI uri)
