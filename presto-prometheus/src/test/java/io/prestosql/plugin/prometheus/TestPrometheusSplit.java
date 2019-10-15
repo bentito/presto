@@ -47,8 +47,6 @@ import static io.prestosql.plugin.prometheus.PrometheusSplitManager.decimalSecon
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.timeUnitsToMillis;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.timeUnitsToSeconds;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
-import static java.time.LocalDateTime.of;
-import static java.time.LocalDateTime.ofEpochSecond;
 import static java.time.LocalDateTime.ofInstant;
 import static org.apache.http.client.utils.URLEncodedUtils.parse;
 import static org.testng.Assert.assertEquals;
@@ -119,7 +117,7 @@ public class TestPrometheusSplit
             throws URISyntaxException
     {
         PrometheusConnectorConfig config = new PrometheusConnectorConfig();
-        LocalDateTime now = of(2019, 10, 2, 7, 26, 56, 00);
+        LocalDateTime now = java.time.LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
         PrometheusTimeMachine.useFixedClockAt(now);
 
         dataUri = prometheusHttpServer.resolve("/prometheus-data/prom-metrics-non-standard-name.json");
@@ -152,7 +150,7 @@ public class TestPrometheusSplit
     {
         PrometheusConnectorConfig config = new PrometheusConnectorConfig();
         dataUri = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
-        LocalDateTime now = of(2019, 10, 2, 7, 26, 56, 00);
+        LocalDateTime now = java.time.LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
         PrometheusTimeMachine.useFixedClockAt(now);
 
         config.setPrometheusURI(dataUri);
@@ -185,7 +183,7 @@ public class TestPrometheusSplit
         PrometheusConnectorConfig config = new PrometheusConnectorConfig();
         dataUri = prometheusHttpServer.resolve("/prometheus-data/prometheus-metrics.json");
         config.setPrometheusURI(dataUri);
-        LocalDateTime now = of(2019, 10, 2, 7, 26, 56, 00);
+        LocalDateTime now = java.time.LocalDateTime.of(2019, 10, 2, 7, 26, 56, 00);
         PrometheusTimeMachine.useFixedClockAt(now);
 
         config.setMaxQueryRangeDuration("21d");

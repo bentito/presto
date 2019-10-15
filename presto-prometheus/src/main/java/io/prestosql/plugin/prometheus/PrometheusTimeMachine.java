@@ -22,6 +22,11 @@ import java.time.ZoneId;
  */
 public class PrometheusTimeMachine
 {
+    private PrometheusTimeMachine()
+    {
+        // no default or public constructor for utility class
+    }
+
     private static Clock clock = Clock.systemDefaultZone();
     private static ZoneId zoneId = ZoneId.systemDefault();
 

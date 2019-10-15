@@ -118,9 +118,15 @@ public class PrometheusSplitManager
     {
         java.time.Duration maxQueryRangeDuration = java.time.Duration.ofMillis(Duration.valueOf(maxQueryRangeDurationStr).toMillis());
         java.time.Duration queryChunkSizeDuration = java.time.Duration.ofMillis(Duration.valueOf(queryChunkSizeDurationStr).toMillis());
-        if (maxQueryRangeDuration.isNegative()) { throw new IllegalArgumentException("max-query-range-duration may not be negative"); }
-        if (queryChunkSizeDuration.isNegative()) { throw new IllegalArgumentException("query-chunk-size-duration may not be negative"); }
-        if (queryChunkSizeDuration.isZero()) { throw new IllegalArgumentException("query-chunk-size-duration may not be zero"); }
+        if (maxQueryRangeDuration.isNegative()) {
+            throw new IllegalArgumentException("max-query-range-duration may not be negative");
+        }
+        if (queryChunkSizeDuration.isNegative()) {
+            throw new IllegalArgumentException("query-chunk-size-duration may not be negative");
+        }
+        if (queryChunkSizeDuration.isZero()) {
+            throw new IllegalArgumentException("query-chunk-size-duration may not be zero");
+        }
         BigDecimal maxQueryRangeDecimal = BigDecimal.valueOf(maxQueryRangeDuration.getSeconds()).add(BigDecimal.valueOf(maxQueryRangeDuration.getNano(), 9));
         BigDecimal queryChunkSizeDecimal = BigDecimal.valueOf(queryChunkSizeDuration.getSeconds()).add(BigDecimal.valueOf(queryChunkSizeDuration.getNano(), 9));
 

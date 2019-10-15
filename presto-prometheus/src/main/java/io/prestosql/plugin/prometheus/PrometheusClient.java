@@ -35,7 +35,6 @@ import org.apache.http.client.utils.URIBuilder;
 
 import javax.inject.Inject;
 
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
