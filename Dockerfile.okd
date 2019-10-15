@@ -73,10 +73,8 @@ COPY presto-password-authenticators /build/presto-password-authenticators
 COPY src /build/src
 COPY pom.xml /build/pom.xml
 
-# Install presto-server
-RUN cd /build/presto-server && mvn -B -e -T 1C -DskipTests -DfailIfNoTests=false -Dtest=false package
-# Install presto-cli
-RUN cd /build/presto-cli && mvn -B -e -T 1C -DskipTests -DfailIfNoTests=false -Dtest=false package
+# build presto
+RUN cd /build && mvn -B -e -T 1C -DskipTests -DfailIfNoTests=false -Dtest=false clean package -pl '!presto-testing-docker'
 # Install prometheus-jmx agent
 RUN mvn -B dependency:get -Dartifact=io.prometheus.jmx:jmx_prometheus_javaagent:0.3.1:jar -Ddest=/build/jmx_prometheus_javaagent.jar
 
