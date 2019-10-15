@@ -22,7 +22,6 @@ import static org.testng.Assert.assertEquals;
 
 public class TestPrometheusTimestampDeserializer
 {
-
     @Test
     public void testDeserializeTimestamp()
     {
