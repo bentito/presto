@@ -374,11 +374,12 @@ public class TestPrometheusSplit
      * @param endTime
      * @return
      */
-    private List<Double> mockPrometheusResponseToQuery(String queryChunkDuration, String endTime)
+    private List<Double> mockPrometheusResponseToQuery(String queryChunkDuration, String endTimeStr)
     {
+        Double endTime = Double.valueOf(endTimeStr);
+        Double duration = Double.valueOf(timeUnitsToSeconds(queryChunkDuration));
         return promTimeValuesMock.stream()
-                .filter(promTimeValue -> ((Double.parseDouble(endTime) - new Double(timeUnitsToSeconds(queryChunkDuration))) <= promTimeValue) &&
-                        (promTimeValue <= Double.parseDouble(endTime)))
+                .filter(promTimeValue -> ((endTime - duration) <= promTimeValue) && (promTimeValue <= endTime))
                 .collect(Collectors.toList());
     }
 

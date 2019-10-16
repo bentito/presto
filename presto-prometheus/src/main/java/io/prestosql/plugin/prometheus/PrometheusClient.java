@@ -13,7 +13,6 @@
  */
 package io.prestosql.plugin.prometheus;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -50,6 +49,7 @@ import java.util.stream.Collectors;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.timeUnitsToSeconds;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_ERROR;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class PrometheusClient
@@ -190,7 +190,7 @@ public class PrometheusClient
         if (tokenFileName != null) {
             try {
                 File tokenFile = new File(tokenFileName);
-                return Optional.of(Files.toString(tokenFile, Charsets.UTF_8));
+                return Optional.of(Files.toString(tokenFile, UTF_8));
             }
             catch (Exception e) {
                 throw new PrestoException(NOT_FOUND, "Failed to find/read file: " + tokenFileName, e);
