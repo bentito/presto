@@ -74,7 +74,7 @@ COPY src /build/src
 COPY pom.xml /build/pom.xml
 
 # build presto
-RUN cd /build && mvn -B -e -T 1C -DskipTests -DfailIfNoTests=false -Dtest=false clean package -pl '!presto-testing-docker'
+RUN cd /build && mvn -B -e -DskipTests -DfailIfNoTests=false -Dtest=false clean package -pl '!presto-testing-docker'
 # Install prometheus-jmx agent
 RUN mvn -B dependency:get -Dartifact=io.prometheus.jmx:jmx_prometheus_javaagent:0.3.1:jar -Ddest=/build/jmx_prometheus_javaagent.jar
 
