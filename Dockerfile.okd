@@ -17,6 +17,7 @@ COPY presto-memory /build/presto-memory
 COPY presto-redshift /build/presto-redshift
 COPY presto-benchmark-driver /build/presto-benchmark-driver
 COPY presto-thrift-api /build/presto-thrift-api
+COPY presto-kinesis /build/presto-kinesis
 COPY presto-blackhole /build/presto-blackhole
 COPY presto-verifier /build/presto-verifier
 COPY presto-server-rpm /build/presto-server-rpm
@@ -36,6 +37,7 @@ COPY presto-parser /build/presto-parser
 COPY presto-docs /build/presto-docs
 COPY presto-kafka /build/presto-kafka
 COPY presto-session-property-managers /build/presto-session-property-managers
+COPY presto-iceberg /build/presto-iceberg
 COPY presto-mongodb /build/presto-mongodb
 COPY presto-record-decoder /build/presto-record-decoder
 COPY presto-tpcds /build/presto-tpcds
@@ -66,6 +68,7 @@ COPY presto-testing-docker /build/presto-testing-docker
 COPY presto-memory-context /build/presto-memory-context
 COPY presto-benchmark /build/presto-benchmark
 COPY presto-example-http /build/presto-example-http
+COPY presto-google-sheets /build/presto-google-sheets
 COPY presto-kudu /build/presto-kudu
 COPY presto-main /build/presto-main
 COPY presto-raptor-legacy /build/presto-raptor-legacy
@@ -100,7 +103,7 @@ RUN chmod +x /usr/bin/tini
 
 RUN mkdir -p /opt/presto
 
-ENV PRESTO_VERSION 315
+ENV PRESTO_VERSION 322
 ENV PRESTO_HOME /opt/presto/presto-server
 ENV PRESTO_CLI /opt/presto/presto-cli
 ENV PROMETHEUS_JMX_EXPORTER /opt/jmx_exporter/jmx_exporter.jar
