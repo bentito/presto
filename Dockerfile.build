@@ -3,6 +3,6 @@ FROM fedora:28 as build
 RUN yum -y update && yum clean all
 
 RUN yum -y install \
-        git java-1.8.0-openjdk maven rsync tzdata \
+        git java-1.8.0-openjdk maven rsync tzdata libaio \
     && yum clean all \
     && rm -rf /var/cache/yum
