@@ -34,7 +34,7 @@ function run_tests() {
     ./mvnw -v
     ./mvnw clean -B
     ./mvnw install $MAVEN_FAST_INSTALL -B -pl "${TEST_SPECIFIC_MODULES}" -am
-    ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B -pl "${TEST_SPECIFIC_MODULES}" -Dair.test.jvmsize=$JVM_HEAPSIZE
+    ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B -pl "${TEST_SPECIFIC_MODULES}" -Dair.test.jvmsize=$JVM_HEAPSIZE -Dtest="!io.prestosql.execution.sessionpropertymanagers.TestDbSessionPropertyManagerIntegration"
 }
 
 function main() {
