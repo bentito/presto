@@ -1,9 +1,10 @@
 FROM fedora:28 as build
 
-RUN yum -y update && yum clean all
-
-RUN yum -y install \
-        java-1.8.0-openjdk maven \
+RUN set -x; \
+    INSTALL_PKGS="java-1.8.0-openjdk maven" \
+    && yum clean all && rm -rf /var/cache/yum/* \
+    && yum install -y \
+        $INSTALL_PKGS  \
     && yum clean all \
     && rm -rf /var/cache/yum
 
@@ -86,14 +87,12 @@ FROM centos:7
 # our copy of faq and jq
 COPY faq.repo /etc/yum.repos.d/ecnahc515-faq-epel-7.repo
 
-RUN yum -y install epel-release
-RUN yum -y install --setopt=skip_missing_names_on_install=False \
-        java-1.8.0-openjdk \
-        java-1.8.0-openjdk-devel \
-        openssl \
-        less \
-        rsync \
-        faq \
+RUN set -x; \
+    INSTALL_PKGS="java-1.8.0-openjdk java-1.8.0-openjdk-devel openssl less rsync faq" \
+    && yum clean all \
+    && rm -rf /var/cache/yum/* \
+    && yum -y install epel-release \
+    && yum install --setopt=skip_missing_names_on_install=False -y $INSTALL_PKGS \
     && yum clean all \
     && rm -rf /var/cache/yum
 
