@@ -5,7 +5,7 @@ set -e
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 
 TEST_SPECIFIC_MODULES=${TEST_SPECIFIC_MODULES:-presto-tests}
-JVM_HEAPSIZE="${JVM_HEAPSIZE:-2048M}"
+JVM_HEAPSIZE="${JVM_HEAPSIZE:-4096M}"
 
 export MAVEN_OPTS="-Xmx$JVM_HEAPSIZE -XX:+ExitOnOutOfMemoryError"
 MAVEN_SKIP_CHECKS_AND_DOCS="-Dair.check.skip-all=true -Dmaven.javadoc.skip=true"
@@ -34,7 +34,7 @@ function run_tests() {
     ./mvnw -v
     ./mvnw clean -B
     ./mvnw install $MAVEN_FAST_INSTALL -B -pl "${TEST_SPECIFIC_MODULES}" -am
-    ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B -pl "${TEST_SPECIFIC_MODULES}" -Dair.test.jvmsize=$JVM_HEAPSIZE -Dtest="!io.prestosql.execution.sessionpropertymanagers.TestDbSessionPropertyManagerIntegration"
+    ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B -pl "${TEST_SPECIFIC_MODULES}" -Dtest="!io.prestosql.execution.sessionpropertymanagers.TestDbSessionPropertyManagerIntegration"
 }
 
 function main() {
