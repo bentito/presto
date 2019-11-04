@@ -44,6 +44,7 @@ COPY presto-record-decoder /build/presto-record-decoder
 COPY presto-tpcds /build/presto-tpcds
 COPY presto-plugin-toolkit /build/presto-plugin-toolkit
 COPY presto-spi /build/presto-spi
+COPY presto-prometheus /build/presto-prometheus
 COPY presto-thrift-testing-server /build/presto-thrift-testing-server
 COPY presto-cli /build/presto-cli
 COPY presto-hive /build/presto-hive
