@@ -30,8 +30,7 @@ import java.util.Set;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.METRIC_CODEC;
-import static io.prestosql.plugin.prometheus.MetadataUtil.mapType;
-import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
+import static io.prestosql.plugin.prometheus.MetadataUtil.varcharMapType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -77,7 +76,7 @@ public class TestPrometheusClient
         assertNotNull(table, "table is null");
         assertEquals(table.getName(), "up");
         assertEquals(table.getColumns(), ImmutableList.of(
-                new PrometheusColumn("labels", mapType(createUnboundedVarcharType(), createUnboundedVarcharType())),
+                new PrometheusColumn("labels", varcharMapType),
                 new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
                 new PrometheusColumn("value", DoubleType.DOUBLE)));
     }

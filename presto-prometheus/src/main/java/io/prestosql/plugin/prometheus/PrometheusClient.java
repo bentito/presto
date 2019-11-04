@@ -25,9 +25,9 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeSignature;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -51,6 +51,8 @@ import java.util.stream.Collectors;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.timeUnitsToSeconds;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_ERROR;
+import static io.prestosql.spi.type.TypeSignature.mapType;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -59,7 +61,6 @@ public class PrometheusClient
     // schema name is fixed to "default"
     private final Supplier<Map<String, Object>> tableSupplier;
     protected static PrometheusConnectorConfig config;
-    private static TypeManager typeManager;
     protected static final String METRICS_ENDPOINT = "/api/v1/label/__name__/values";
     static List<PrometheusColumn> prometheusColumns;
     private Optional<TupleDomain<ColumnHandle>> pushedDown = Optional.empty();
@@ -82,10 +83,10 @@ public class PrometheusClient
 
         tableSupplier = Suppliers.memoizeWithExpiration(metricsSupplier(metricCodec, getPrometheusMetricsURI(config)),
                 timeUnitsToSeconds(config.getCacheDuration()), TimeUnit.SECONDS);
+        MapType varcharMapType = (MapType) typeManager.getType(mapType(VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature()));
         this.config = config;
-        this.typeManager = typeManager;
         this.prometheusColumns = ImmutableList.of(
-                new PrometheusColumn("labels", typeManager.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"))),
+                new PrometheusColumn("labels", varcharMapType),
                 new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
                 new PrometheusColumn("value", DoubleType.DOUBLE));
     }

@@ -30,7 +30,6 @@ import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.type.InternalTypeManager;
 import org.apache.http.NameValuePair;
 import org.testng.annotations.AfterClass;
@@ -56,6 +55,7 @@ import java.util.stream.Collectors;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.METRIC_CODEC;
+import static io.prestosql.plugin.prometheus.MetadataUtil.varcharMapType;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.OFFSET_MILLIS;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.decimalSecondString;
 import static io.prestosql.plugin.prometheus.PrometheusSplitManager.longFromDecimalSecondString;
@@ -90,7 +90,7 @@ public class TestPrometheusSplit
     {
         prometheusTable = new PrometheusTable("tableName",
                 ImmutableList.of(
-                        new PrometheusColumn("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar,varchar)"))),
+                        new PrometheusColumn("labels", varcharMapType),
                         new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
                         new PrometheusColumn("value", DoubleType.DOUBLE)));
     }

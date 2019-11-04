@@ -19,12 +19,12 @@ import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.type.InternalTypeManager;
 import org.testng.annotations.Test;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.TABLE_CODEC;
+import static io.prestosql.plugin.prometheus.MetadataUtil.varcharMapType;
 import static org.testng.Assert.assertEquals;
 
 public class TestPrometheusTable
@@ -33,7 +33,7 @@ public class TestPrometheusTable
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
     private final PrometheusTable prometheusTable = new PrometheusTable("tableName",
             ImmutableList.of(
-                    new PrometheusColumn("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar,varchar)"))),
+                    new PrometheusColumn("labels", varcharMapType),
                     new PrometheusColumn("timestamp", TimestampType.TIMESTAMP),
                     new PrometheusColumn("value", DoubleType.DOUBLE)));
 
@@ -41,7 +41,7 @@ public class TestPrometheusTable
     public void testColumnMetadata()
     {
         assertEquals(prometheusTable.getColumnsMetadata(), ImmutableList.of(
-                new ColumnMetadata("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar,varchar)"))),
+                new ColumnMetadata("labels", varcharMapType),
                 new ColumnMetadata("timestamp", TimestampType.TIMESTAMP),
                 new ColumnMetadata("value", DoubleType.DOUBLE)));
     }

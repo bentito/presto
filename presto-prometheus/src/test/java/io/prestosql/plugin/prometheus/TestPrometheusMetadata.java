@@ -34,7 +34,7 @@ import java.util.Optional;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.prometheus.MetadataUtil.METRIC_CODEC;
-import static io.prestosql.plugin.prometheus.MetadataUtil.mapType;
+import static io.prestosql.plugin.prometheus.MetadataUtil.varcharMapType;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
@@ -123,7 +123,7 @@ public class TestPrometheusMetadata
         ConnectorTableMetadata tableMetadata = metadata.getTableMetadata(SESSION, RUNTIME_DETERMINED_TABLE_HANDLE);
         assertEquals(tableMetadata.getTable(), new SchemaTableName("default", "up"));
         assertEquals(tableMetadata.getColumns(), ImmutableList.of(
-                new ColumnMetadata("labels", mapType(createUnboundedVarcharType(), createUnboundedVarcharType())),
+                new ColumnMetadata("labels", varcharMapType),
                 new ColumnMetadata("timestamp", TimestampType.TIMESTAMP),
                 new ColumnMetadata("value", DOUBLE)));
 

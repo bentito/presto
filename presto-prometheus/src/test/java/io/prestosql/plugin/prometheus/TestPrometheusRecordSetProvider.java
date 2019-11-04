@@ -22,9 +22,7 @@ import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
-import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.type.InternalTypeManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -37,8 +35,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
+import static io.prestosql.plugin.prometheus.MetadataUtil.varcharMapType;
 import static io.prestosql.plugin.prometheus.PrometheusRecordCursor.getMapFromBlock;
-import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -49,7 +47,6 @@ public class TestPrometheusRecordSetProvider
     private URI dataUri;
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
-    static final Type varcharMapType = TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"));
 
     @Test
     public void testGetRecordSet()
@@ -58,7 +55,7 @@ public class TestPrometheusRecordSetProvider
         PrometheusRecordSetProvider recordSetProvider = new PrometheusRecordSetProvider();
         RecordSet recordSet = recordSetProvider.getRecordSet(PrometheusTransactionHandle.INSTANCE, SESSION,
                 new PrometheusSplit(dataUri), tableHandle, ImmutableList.of(
-                        new PrometheusColumnHandle("labels", MetadataUtil.mapType(createUnboundedVarcharType(), createUnboundedVarcharType()), 0),
+                        new PrometheusColumnHandle("labels", varcharMapType, 0),
                         new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 1),
                         new PrometheusColumnHandle("value", DoubleType.DOUBLE, 2)));
         assertNotNull(recordSet, "recordSet is null");

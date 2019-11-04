@@ -15,7 +15,6 @@ package io.prestosql.plugin.prometheus;
 
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonCodecFactory;
@@ -24,7 +23,8 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeSignatureParameter;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.type.InternalTypeManager;
 
 import java.util.Map;
 
@@ -32,6 +32,8 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
+import static io.prestosql.spi.type.TypeSignature.mapType;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.util.Locale.ENGLISH;
 
@@ -44,7 +46,10 @@ public final class MetadataUtil
     public static final JsonCodec<PrometheusTable> TABLE_CODEC;
     public static final JsonCodec<PrometheusColumnHandle> COLUMN_CODEC;
     public static final JsonCodec<Map<String, Object>> METRIC_CODEC;
+
     private static final Metadata METADATA = createTestMetadataManager();
+    private static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
+    static final MapType varcharMapType = (MapType) TYPE_MANAGER.getType(mapType(VARCHAR.getTypeSignature(), VARCHAR.getTypeSignature()));
 
     static {
         ObjectMapperProvider objectMapperProvider = new ObjectMapperProvider();
@@ -59,8 +64,7 @@ public final class MetadataUtil
             extends FromStringDeserializer<Type>
     {
         private final Map<String, Type> types = ImmutableMap.of(
-                mapType(createUnboundedVarcharType(), createUnboundedVarcharType()).getTypeSignature().toString(),
-                mapType(createUnboundedVarcharType(), createUnboundedVarcharType()),
+                varcharMapType.getTypeSignature().toString(), varcharMapType,
                 StandardTypes.BIGINT, BIGINT,
                 StandardTypes.TIMESTAMP, TIMESTAMP,
                 StandardTypes.DOUBLE, DOUBLE,
@@ -80,12 +84,5 @@ public final class MetadataUtil
             }
             return type;
         }
-    }
-
-    public static MapType mapType(Type keyType, Type valueType)
-    {
-        return (MapType) METADATA.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
-                TypeSignatureParameter.of(keyType.getTypeSignature()),
-                TypeSignatureParameter.of(valueType.getTypeSignature())));
     }
 }

@@ -22,9 +22,7 @@ import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.TimestampType;
-import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
-import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.type.InternalTypeManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -38,6 +36,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
+import static io.prestosql.plugin.prometheus.MetadataUtil.varcharMapType;
 import static io.prestosql.plugin.prometheus.PrometheusRecordCursor.getBlockFromMap;
 import static io.prestosql.plugin.prometheus.PrometheusRecordCursor.getMapFromBlock;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -51,7 +50,6 @@ public class TestPrometheusRecordSet
     private URI dataUri;
     private static final Metadata METADATA = createTestMetadataManager();
     public static final TypeManager TYPE_MANAGER = new InternalTypeManager(METADATA);
-    static final Type varcharMapType = TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)"));
 
     @Test
     public void testGetColumnTypes()
@@ -81,12 +79,12 @@ public class TestPrometheusRecordSet
     public void testCursorSimple()
     {
         RecordSet recordSet = new PrometheusRecordSet(new PrometheusSplit(dataUri), ImmutableList.of(
-                new PrometheusColumnHandle("labels", TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)")), 0),
+                new PrometheusColumnHandle("labels", varcharMapType, 0),
                 new PrometheusColumnHandle("timestamp", TimestampType.TIMESTAMP, 1),
                 new PrometheusColumnHandle("value", DoubleType.DOUBLE, 2)));
         RecordCursor cursor = recordSet.cursor();
 
-        assertEquals(cursor.getType(0), TYPE_MANAGER.getType(TypeSignature.parseTypeSignature("map(varchar, varchar)")));
+        assertEquals(cursor.getType(0), varcharMapType);
         assertEquals(cursor.getType(1), TimestampType.TIMESTAMP);
         assertEquals(cursor.getType(2), DoubleType.DOUBLE);
 
