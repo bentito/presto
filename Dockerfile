@@ -1,6 +1,6 @@
 FROM fedora:28 as build
 
-RUN set -x; \
+RUN set -x && \
     INSTALL_PKGS="java-1.8.0-openjdk maven" \
     && yum clean all && rm -rf /var/cache/yum/* \
     && yum install -y \
