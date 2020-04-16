@@ -78,8 +78,11 @@ COPY presto-password-authenticators /build/presto-password-authenticators
 COPY src /build/src
 COPY pom.xml /build/pom.xml
 
+# load Maven cache as its own layer
+RUN cd /build && mvn --batch-mode --errors de.qaware.maven:go-offline-maven-plugin:resolve-dependencies -DdownloadSources -DdownloadJavadoc -Dmaven.repo.local=.m2/repository
+
 # build presto
-RUN cd /build && mvn -B -e -DskipTests -DfailIfNoTests=false -Dtest=false clean package -pl '!presto-testing-docker'
+RUN cd /build && mvn --batch-mode --errors -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -DskipTests -DfailIfNoTests=false -Dtest=false clean package -pl '!presto-testing-docker' -Dmaven.repo.local=.m2/repository
 # Install prometheus-jmx agent
 RUN mvn -B dependency:get -Dartifact=io.prometheus.jmx:jmx_prometheus_javaagent:0.3.1:jar -Ddest=/build/jmx_prometheus_javaagent.jar
 
