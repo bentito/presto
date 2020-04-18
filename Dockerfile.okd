@@ -1,10 +1,9 @@
 FROM fedora:28 as build
 
-RUN set -x && \
-    INSTALL_PKGS="java-1.8.0-openjdk maven" \
+RUN set -x \
+    && INSTALL_PKGS="java-1.8.0-openjdk maven" \
     && yum clean all && rm -rf /var/cache/yum/* \
-    && yum install --setopt=skip_missing_names_on_install=False -y \
-        $INSTALL_PKGS  \
+    && yum install --setopt=skip_missing_names_on_install=False -y $INSTALL_PKGS \
     && yum clean all \
     && rm -rf /var/cache/yum
 
@@ -88,8 +87,8 @@ FROM registry.access.redhat.com/ubi7/ubi
 # our copy of faq and jq
 COPY faq.repo /etc/yum.repos.d/ecnahc515-faq-epel-7.repo
 
-RUN set -x; \
-    INSTALL_PKGS="java-1.8.0-openjdk java-1.8.0-openjdk-devel openssl less rsync faq" \
+RUN set -x \
+    && INSTALL_PKGS="java-1.8.0-openjdk java-1.8.0-openjdk-devel openssl less rsync faq" \
     && yum clean all \
     && rm -rf /var/cache/yum/* \
     && yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
@@ -113,9 +112,9 @@ ENV JAVA_HOME=/etc/alternatives/jre
 
 RUN mkdir -p $PRESTO_HOME
 
-COPY --from=build /build/presto-server/target/presto-server-$PRESTO_VERSION $PRESTO_HOME
-COPY --from=build /build/presto-cli/target/presto-cli-$PRESTO_VERSION-executable.jar $PRESTO_CLI
-COPY --from=build /build/jmx_prometheus_javaagent.jar $PROMETHEUS_JMX_EXPORTER
+COPY --from=build /build/presto-server/target/presto-server-${PRESTO_VERSION} ${PRESTO_HOME}
+COPY --from=build /build/presto-cli/target/presto-cli-${PRESTO_VERSION}-executable.jar ${PRESTO_CLI}
+COPY --from=build /build/jmx_prometheus_javaagent.jar ${PROMETHEUS_JMX_EXPORTER}
 
 # https://docs.oracle.com/javase/7/docs/technotes/guides/net/properties.html
 # Java caches dns results forever, don't cache dns results forever:
