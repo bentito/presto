@@ -105,6 +105,9 @@ RUN mkdir -p /opt/presto
 ENV PRESTO_VERSION 322
 ENV PRESTO_HOME /opt/presto/presto-server
 ENV PRESTO_CLI /opt/presto/presto-cli
+# Note: podman was having difficulties evaluating the PRESTO_VERSION
+# environment variables: https://github.com/containers/libpod/issues/4878
+ARG PRESTO_VERSION=${PRESTO_VERSION}
 ENV PROMETHEUS_JMX_EXPORTER /opt/jmx_exporter/jmx_exporter.jar
 ENV TERM linux
 ENV HOME /opt/presto
