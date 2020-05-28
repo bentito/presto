@@ -1,7 +1,7 @@
 FROM rhel7:7-released AS build
 
-ENV PRESTO_VERSION 322.0
-ENV RH_PRESTO_PATCH_VERSION 00001
+ENV PRESTO_VERSION 315.0
+ENV RH_PRESTO_PATCH_VERSION 00003
 ENV RH_PRESTO_VERSION ${PRESTO_VERSION}.0.redhat-${RH_PRESTO_PATCH_VERSION}
 ENV RH_PRESTO_BREW_DIR ${PRESTO_VERSION}.0.redhat_${RH_PRESTO_PATCH_VERSION}
 ENV PRESTO_SERVER_OUT /build/presto-server/target/presto-server-${PRESTO_VERSION}
@@ -45,7 +45,7 @@ RUN set -x; \
 
 RUN mkdir -p /opt/presto
 
-ENV PRESTO_VERSION 322.0
+ENV PRESTO_VERSION 315.0
 ENV PRESTO_HOME /opt/presto/presto-server
 ENV PRESTO_CLI /opt/presto/presto-cli
 # Note: podman was having difficulties evaluating the PRESTO_VERSION
