@@ -75,6 +75,8 @@ COPY presto-kudu /build/presto-kudu
 COPY presto-main /build/presto-main
 COPY presto-raptor-legacy /build/presto-raptor-legacy
 COPY presto-password-authenticators /build/presto-password-authenticators
+COPY presto-testing /build/presto-testing
+COPY presto-memsql /build/presto-memsql
 COPY src /build/src
 COPY pom.xml /build/pom.xml
 
@@ -88,11 +90,13 @@ RUN mvn -B dependency:get -Dartifact=io.prometheus.jmx:jmx_prometheus_javaagent:
 
 FROM centos:7
 
-# our copy of faq and jq
-COPY faq.repo /etc/yum.repos.d/ecnahc515-faq-epel-7.repo
+# go get faq via static Linux binary approach
+ARG LATEST_RELEASE=0.0.6
+RUN curl -Lo /usr/local/bin/faq https://github.com/jzelinskie/faq/releases/download/$LATEST_RELEASE/faq-linux-amd64
+RUN chmod +x /usr/local/bin/faq
 
 RUN set -x; \
-    INSTALL_PKGS="java-1.8.0-openjdk java-1.8.0-openjdk-devel openssl less rsync faq" \
+    INSTALL_PKGS="java-1.8.0-openjdk java-1.8.0-openjdk-devel openssl less rsync" \
     && yum clean all \
     && rm -rf /var/cache/yum/* \
     && yum -y install epel-release \
@@ -106,7 +110,7 @@ RUN chmod +x /usr/bin/tini
 
 RUN mkdir -p /opt/presto
 
-ENV PRESTO_VERSION 322
+ENV PRESTO_VERSION 328
 ENV PRESTO_HOME /opt/presto/presto-server
 ENV PRESTO_CLI /opt/presto/presto-cli
 # Note: podman was having difficulties evaluating the PRESTO_VERSION
